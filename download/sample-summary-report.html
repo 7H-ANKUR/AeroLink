@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>FSOC-PAT Run Report — 20260913T131546Z-3fb6c4</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0d10; color: #e8edf1; margin: 32px auto; max-width: 860px; padding: 0 24px; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.4px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1.2px; color: #7d8994; border-bottom: 1px solid #252c33; padding-bottom: 6px; margin-top: 32px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+  td, th { border-bottom: 1px solid #1c232a; padding: 8px 10px; text-align: left; }
+  th { color: #7d8994; font-weight: 500; }
+  td.v { font-family: 'Cascadia Mono', Consolas, monospace; font-variant-numeric: tabular-nums; }
+  .pass { color: #79c99b; font-weight: 600; }
+  .fail { color: #d87575; font-weight: 600; }
+  .na, .muted { color: #58636d; }
+  .meta { color: #7d8994; font-size: 12px; }
+  .tag { display:inline-block; border:1px solid #313a43; border-radius:4px; padding:2px 8px; font-size:11px; color:#c3ccd4; margin-right:6px; }
+</style>
+</head>
+<body>
+<h1>FSOC-PAT — Performance Report</h1>
+<p class="meta">Run <strong>20260913T131546Z-3fb6c4</strong> · completed 2026-09-13T13:15:46.672Z · software v1.0.0</p>
+<p>
+  <span class="tag">Mode: simulation</span>
+  <span class="tag">Scenario: PS169-03 Figure-8 / Clear</span>
+  <span class="tag">Seed: 42</span>
+  <span class="tag">Detector: cv_classical</span>
+  <span class="tag">Tracker: kalman_cv</span>
+  <span class="tag">Controller: pid_angle_space</span>
+  <span class="tag">GT source: simulation</span>
+</p>
+
+<h2>Summary Metrics</h2>
+<table>
+  <tr><th>Metric</th><th>Value</th></tr>
+  <tr><td>Duration</td><td class="v">5.28 s</td></tr>
+  <tr><td>Acquisition time</td><td class="v">0.800 s</td></tr>
+  <tr><td>Average tracking error (centroiding)</td><td class="v">5.976 px</td></tr>
+  <tr><td>Max tracking error</td><td class="v">28.66 px</td></tr>
+  <tr><td>RMSE</td><td class="v">6.626 px</td></tr>
+  <tr><td>p95 / p99 error</td><td class="v">8.86 px / 12.37 px</td></tr>
+  <tr><td>Target loss</td><td class="v">1.17 %</td></tr>
+  <tr><td>Lock retention</td><td class="v">97.07 %</td></tr>
+  <tr><td>Re-acquisition avg / max</td><td class="v"><span class="na">not computable</span> / <span class="na">not computable</span> (0 events)</td></tr>
+  <tr><td>Algorithm FPS (pipeline-only)</td><td class="v">649.53</td></tr>
+  <tr><td>Wall-clock FPS</td><td class="v">340.80</td></tr>
+  <tr><td>Avg processing time</td><td class="v">1.54 ms</td></tr>
+  <tr><td>Frames processed / dropped</td><td class="v">1800 / 0</td></tr>
+  <tr><td>Detection rate</td><td class="v">98.83 %</td></tr>
+  <tr><td>Longest continuous TRACK streak</td><td class="v">1777 frames</td></tr>
+  <tr><td>Avg detection confidence</td><td class="v">1.000</td></tr>
+</table>
+
+
+
+<h2>PS-169 Official Benchmark Gates</h2>
+<table>
+  <tr><th>Metric</th><th>Official target</th><th>Measured</th><th>Result</th></tr>
+  <tr><td>Acquisition time</td><td class="v">≤ 2.00 s</td><td class="v">0.800 s</td><td><span class="pass">✓ PASS</span></td></tr>
+  <tr><td>Average tracking error</td><td class="v">≤ 10 px</td><td class="v">5.98 px</td><td><span class="pass">✓ PASS</span></td></tr>
+  <tr><td>Target loss</td><td class="v">&lt; 5 %</td><td class="v">1.17 %</td><td><span class="pass">✓ PASS</span></td></tr>
+  <tr><td>Re-acquisition (avg)</td><td class="v">≤ 1.00 s</td><td class="v"><span class="na">not computable</span></td><td><span class="pass">✓ PASS</span></td></tr>
+  <tr><td>Processing speed</td><td class="v">≥ 20 FPS</td><td class="v">649.53</td><td><span class="pass">✓ PASS</span></td></tr>
+</table>
+<p class="meta">Official PS-169 targets, visually distinct from internal engineering thresholds.
+Lock policy: predicted frames count toward lock retention.</p>
+
+<h2>Reproducibility</h2>
+<p class="meta">Deterministic run under seed 42. Reproduce by loading the bundled
+config into the scenario builder with identical engine version v1.0.0.</p>
+</body>
+</html>

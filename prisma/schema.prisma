@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// FSOC-PAT run registry (mirrors docs/05-database-schema.md §5)
+// Stores the canonical RunResult for every completed run so that
+// Analytics / Replay / Comparison views survive page reloads.
+model Run {
+  id                   String   @id @default(uuid())
+  runId                String   @unique // e.g. 20260913T141200Z-a1b2c3
+  mode                 String // simulation | video
+  scenarioName         String
+  scenarioSeed         Int
+  detector             String
+  tracker              String
+  controller           String
+  durationS            Float
+  fpsMeasured          Float
+  acquisitionTimeS     Float?
+  avgErrorPx           Float?
+  maxErrorPx           Float?
+  rmsePx               Float?
+  p95ErrorPx           Float?
+  targetLossPercent    Float?
+  lockRetentionPercent Float?
+  reacquisitionAvgS    Float?
+  reacquisitionMaxS    Float?
+  reacquisitionEvents  Int      @default(0)
+  processingAvgMs      Float?
+  detectionRatePercent Float?
+  avgConfidence        Float?
+  groundTruthSource    String // simulation | manual_annotation | none
+  passFail             String // JSON: {acquisition,tracking_error,target_loss,reacquisition,processing_speed}
+  resultJson           String // full RunResult JSON (metrics.json equivalent)
+  eventsCsv            String? // per-frame events.csv content (may be capped)
+  notes                String?
+  createdAt            DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([mode])
+}

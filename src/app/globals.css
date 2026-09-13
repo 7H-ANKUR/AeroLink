@@ -1,0 +1,205 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * FSOC-PAT design tokens — professional dark aerospace laboratory theme
+ * (docs/Frontend-Design §2.2, §37, §38). Dark-only instrument theme.
+ */
+:root {
+  --bg-0: #0a0d10;
+  --bg-1: #0e1216;
+  --bg-2: #13181d;
+  --bg-3: #181f25;
+
+  --border-1: #252c33;
+  --border-2: #313a43;
+
+  --text-0: #f3f6f8;
+  --text-1: #c3ccd4;
+  --text-2: #7d8994;
+  --text-3: #58636d;
+
+  --accent-cyan: #72d9e8;
+  --accent-blue: #8faee8;
+
+  --success: #79c99b;
+  --warning: #d8b56b;
+  --danger: #d87575;
+
+  --beacon: #fff7d8;
+  --ground-truth: #90a7ff;
+  --prediction: #d7b36e;
+
+  /* shadcn variable mapping (dark instrument theme) */
+  --background: var(--bg-0);
+  --foreground: var(--text-0);
+  --card: var(--bg-1);
+  --card-foreground: var(--text-0);
+  --popover: var(--bg-2);
+  --popover-foreground: var(--text-0);
+  --primary: var(--accent-cyan);
+  --primary-foreground: #06272c;
+  --secondary: var(--bg-3);
+  --secondary-foreground: var(--text-1);
+  --muted: var(--bg-2);
+  --muted-foreground: var(--text-2);
+  --accent: var(--bg-3);
+  --accent-foreground: var(--text-0);
+  --destructive: var(--danger);
+  --destructive-foreground: #2a0d0d;
+  --border: var(--border-1);
+  --input: var(--border-1);
+  --ring: var(--accent-cyan);
+  --chart-1: var(--accent-cyan);
+  --chart-2: var(--ground-truth);
+  --chart-3: var(--prediction);
+  --chart-4: var(--success);
+  --chart-5: var(--warning);
+  --sidebar: var(--bg-1);
+  --sidebar-foreground: var(--text-1);
+  --sidebar-primary: var(--accent-cyan);
+  --sidebar-primary-foreground: #06272c;
+  --sidebar-accent: var(--bg-3);
+  --sidebar-accent-foreground: var(--text-0);
+  --sidebar-border: var(--border-1);
+  --sidebar-ring: var(--accent-cyan);
+  --radius: 8px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-tech);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  /* FSOC semantic colors */
+  --color-fsoc-bg0: var(--bg-0);
+  --color-fsoc-bg1: var(--bg-1);
+  --color-fsoc-bg2: var(--bg-2);
+  --color-fsoc-bg3: var(--bg-3);
+  --color-fsoc-border1: var(--border-1);
+  --color-fsoc-border2: var(--border-2);
+  --color-fsoc-text0: var(--text-0);
+  --color-fsoc-text1: var(--text-1);
+  --color-fsoc-text2: var(--text-2);
+  --color-fsoc-text3: var(--text-3);
+  --color-fsoc-cyan: var(--accent-cyan);
+  --color-fsoc-blue: var(--accent-blue);
+  --color-fsoc-success: var(--success);
+  --color-fsoc-warning: var(--warning);
+  --color-fsoc-danger: var(--danger);
+  --color-fsoc-beacon: var(--beacon);
+  --color-fsoc-gt: var(--ground-truth);
+  --color-fsoc-pred: var(--prediction);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-size: 14px;
+  letter-spacing: 0.1px;
+}
+
+/* Tabular figures for measured values (docs §3) */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-tech), ui-monospace, monospace;
+}
+
+/* hairline panel style */
+.panel {
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: 8px;
+}
+
+.panel-elevated {
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+}
+
+.panel-title {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+/* thin scrollbars — instrument feel */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--bg-1);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+}
+
+@keyframes fsoc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.status-live {
+  animation: fsoc-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes fsoc-acquire-ring {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.acquire-ring {
+  animation: fsoc-acquire-ring 0.7s ease-out forwards;
+}
+
+@media (max-width: 850px) {
+  .desktop-warning {
+    display: flex;
+  }
+}

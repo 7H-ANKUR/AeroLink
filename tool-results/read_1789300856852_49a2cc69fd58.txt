@@ -1,0 +1,2002 @@
+     1→# FSOC-PAT Frontend Design Specification
+     2→
+     3→## 0. Document Purpose
+     4→
+     5→This document is the frontend source of truth for the FSOC-PAT application:
+     6→
+     7→**AI-Assisted Virtual Camera Tracking System for Coarse Alignment of Mobile Free Space Optical Communication (FSOC) Terminals**
+     8→
+     9→The frontend shall be implemented as a **professional Next.js desktop web interface** for the local simulation/control application or as the visual shell around the Python/PySide6 engine through a future bridge.
+    10→
+    11→The design goal is not to look like a generic "AI dashboard", a SaaS landing page, or a vibecoded prototype.
+    12→
+    13→It must look like a **real aerospace/optical tracking operations console**: restrained, technical, information-dense, precise, calm, and credible.
+    14→
+    15→The UI should communicate:
+    16→
+    17→> "This is a serious engineering instrument used to develop and validate an optical coarse-pointing algorithm."
+    18→
+    19→The frontend must make it visually obvious that the system is actually working:
+    20→- the beacon is moving,
+    21→- the camera is moving,
+    22→- the detector is finding the beacon,
+    23→- the tracker is predicting it,
+    24→- the controller is generating pan/tilt commands,
+    25→- disturbances are affecting the scene,
+    26→- and the measured performance is improving or degrading.
+    27→
+    28→---
+    29→
+    30→# 1. Product Design Principles
+    31→
+    32→## 1.1 Primary Principles
+    33→
+    34→### Instrument, not website
+    35→
+    36→The application should feel like instrumentation software, not a marketing website.
+    37→
+    38→Avoid:
+    39→- giant hero sections,
+    40→- excessive rounded cards,
+    41→- excessive gradients,
+    42→- glowing neon everywhere,
+    43→- random glassmorphism,
+    44→- fake 3D illustrations,
+    45→- excessive icon usage,
+    46→- unnecessary animations.
+    47→
+    48→Use:
+    49→- strong hierarchy,
+    50→- measured spacing,
+    51→- thin technical borders,
+    52→- restrained surfaces,
+    53→- precise typography,
+    54→- data visualization,
+    55→- functional controls,
+    56→- meaningful motion.
+    57→
+    58→### Evidence over decoration
+    59→
+    60→Every visual element should answer one of these questions:
+    61→
+    62→1. Where is the beacon?
+    63→2. Is it detected?
+    64→3. Is it being tracked?
+    65→4. Where is the virtual camera pointing?
+    66→5. How much error exists?
+    67→6. What disturbance is active?
+    68→7. Is the system inside the PS-169 target?
+    69→8. What happened during this run?
+    70→
+    71→### Spatial hierarchy
+    72→
+    73→The screen must visually prioritize:
+    74→
+    75→1. Camera viewport
+    76→2. System state
+    77→3. Tracking/performance metrics
+    78→4. Scenario/control configuration
+    79→5. Event logs
+    80→
+    81→The camera viewport is the primary canvas.
+    82→
+    83→---
+    84→
+    85→# 2. Overall Visual Direction
+    86→
+    87→## 2.1 Theme
+    88→
+    89→**Professional dark aerospace laboratory theme**
+    90→
+    91→Base:
+    92→
+    93→- Background: near-black charcoal, not pure black
+    94→- Primary surfaces: dark graphite
+    95→- Secondary surfaces: slightly elevated graphite
+    96→- Borders: neutral low-contrast gray
+    97→- Text: soft white
+    98→- Secondary text: cool gray
+    99→- Positive status: restrained green
+   100→- Warning: amber
+   101→- Error/lost: red
+   102→- Active optical beacon: warm white / pale cyan
+   103→- Technical accent: muted cyan-blue
+   104→
+   105→Do not use cyan/purple gradients.
+   106→
+   107→## 2.2 Suggested Color Tokens
+   108→
+   109→```css
+   110→:root {
+   111→  --bg-0: #0a0d10;
+   112→  --bg-1: #0e1216;
+   113→  --bg-2: #13181d;
+   114→  --bg-3: #181f25;
+   115→
+   116→  --border-1: #252c33;
+   117→  --border-2: #313a43;
+   118→
+   119→  --text-0: #f3f6f8;
+   120→  --text-1: #c3ccd4;
+   121→  --text-2: #7d8994;
+   122→  --text-3: #58636d;
+   123→
+   124→  --accent-cyan: #72d9e8;
+   125→  --accent-blue: #8faee8;
+   126→
+   127→  --success: #79c99b;
+   128→  --warning: #d8b56b;
+   129→  --danger: #d87575;
+   130→
+   131→  --beacon: #fff7d8;
+   132→  --ground-truth: #90a7ff;
+   133→  --prediction: #d7b36e;
+   134→}
+   135→```
+   136→
+   137→The colors should be used sparingly. The majority of the application remains neutral.
+   138→
+   139→## 2.3 Visual Materials
+   140→
+   141→Use subtle depth through:
+   142→
+   143→- 1px borders
+   144→- 8–12px radius
+   145→- 10–25px shadows
+   146→- very subtle backdrop blur only where useful
+   147→- slightly different surface elevations
+   148→
+   149→Avoid:
+   150→- giant shadows,
+   151→- inflated cards,
+   152→- floating widgets with excessive blur,
+   153→- glossy effects.
+   154→
+   155→---
+   156→
+   157→# 3. Typography
+   158→
+   159→Use one serious UI family and one optional technical numeric family.
+   160→
+   161→Recommended:
+   162→
+   163→```text
+   164→UI:
+   165→Inter
+   166→
+   167→Technical / numeric:
+   168→IBM Plex Mono
+   169→```
+   170→
+   171→Fallback:
+   172→
+   173→```text
+   174→system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif
+   175→```
+   176→
+   177→Numbers that represent measurement should use tabular figures.
+   178→
+   179→Examples:
+   180→
+   181→```text
+   182→48.6 FPS
+   183→4.21 px
+   184→1.12 s
+   185→97.1 %
+   186→+2.40 °/s
+   187→```
+   188→
+   189→Numeric values must visually align between frames.
+   190→
+   191→---
+   192→
+   193→# 4. Layout Philosophy
+   194→
+   195→The main application should use a **three-column operations layout**.
+   196→
+   197→```text
+   198→┌──────────────────────────────────────────────────────────────────────────────┐
+   199→│ TOP SYSTEM BAR                                                               │
+   200→├───────────────┬───────────────────────────────────────────┬──────────────────┤
+   201→│               │                                           │                  │
+   202→│ LEFT CONTROL  │            PRIMARY WORKSPACE              │ RIGHT TELEMETRY  │
+   203→│ PANEL         │                                           │ PANEL            │
+   204→│               │     Camera / Scene / 3D workspace        │                  │
+   205→│               │                                           │                  │
+   206→│               │                                           │                  │
+   207→├───────────────┴───────────────────────────────────────────┴──────────────────┤
+   208→│ TIMELINE / ERROR PLOT / STATE HISTORY                                       │
+   209→├──────────────────────────────────────────────────────────────────────────────┤
+   210→│ EVENT LOG / SYSTEM CONSOLE                                                   │
+   211→└──────────────────────────────────────────────────────────────────────────────┘
+   212→```
+   213→
+   214→The desktop viewport should be optimized around:
+   215→
+   216→```text
+   217→1440 × 900
+   218→1600 × 1000
+   219→1920 × 1080
+   220→```
+   221→
+   222→Do not design around mobile first. This is an engineering desktop application.
+   223→
+   224→A responsive fallback may support smaller displays, but the primary experience is desktop.
+   225→
+   226→---
+   227→
+   228→# 5. Application Shell
+   229→
+   230→## 5.1 Top System Bar
+   231→
+   232→Height:
+   233→
+   234→```text
+   235→56–64 px
+   236→```
+   237→
+   238→Content:
+   239→
+   240→### Left
+   241→
+   242→```text
+   243→FSOC-PAT
+   244→Virtual Coarse Alignment Laboratory
+   245→```
+   246→
+   247→Use a small monochrome optical/reticle mark.
+   248→
+   249→Do not use a generic rocket icon.
+   250→
+   251→### Center
+   252→
+   253→Live run status:
+   254→
+   255→```text
+   256→SIMULATION
+   257→● RUNNING
+   258→RUN 0042
+   259→```
+   260→
+   261→State color should be subtle.
+   262→
+   263→### Right
+   264→
+   265→```text
+   266→FPS 48.6
+   267→CPU 31%
+   268→MEM 1.2 GB
+   269→[Pause]
+   270→[Stop]
+   271→[Settings]
+   272→```
+   273→
+   274→The top bar is for system-level status, not detailed metrics.
+   275→
+   276→---
+   277→
+   278→# 6. Navigation
+   279→
+   280→Avoid a large traditional website sidebar.
+   281→
+   282→Use a narrow operational rail:
+   283→
+   284→```text
+   285→┌──────┐
+   286→│ FSOC │
+   287→├──────┤
+   288→│ ◉    │  Mission / Run
+   289→│ ◫    │  Scenarios
+   290→│ ◇    │  Live Tracking
+   291→│ ◎    │  Analytics
+   292→│ ≡    │  Logs
+   293→│ ⚙    │  Settings
+   294→└──────┘
+   295→```
+   296→
+   297→Width:
+   298→
+   299→```text
+   300→64–72 px
+   301→```
+   302→
+   303→Tooltips explain each icon.
+   304→
+   305→The active section uses:
+   306→- thin cyan indicator,
+   307→- slightly elevated background,
+   308→- no oversized icon.
+   309→
+   310→---
+   311→
+   312→# 7. Primary Dashboard
+   313→
+   314→The default page is the **Mission Control / Live Run** screen.
+   315→
+   316→## 7.1 Main Composition
+   317→
+   318→```text
+   319→┌────────────────────┬────────────────────────────────────┬─────────────────────┐
+   320→│ RUN CONFIGURATION  │                                    │ TRACKING STATUS     │
+   321→│                    │                                    │                     │
+   322→│ Scenario            │                                    │ ● TRACK             │
+   323→│ Figure-8            │                                    │                     │
+   324→│                    │          CAMERA VIEW                │ Beacon #01          │
+   325→│ Beacon              │                                    │ Confidence 0.97     │
+   326→│ 10 × 10 px          │                                    │                     │
+   327→│                    │                                    │ Position            │
+   328→│ FOV                  │              ✦                     │ X 312.4             │
+   329→│ 4° × 3°             │              +                     │ Y 228.9             │
+   330→│                    │                                    │                     │
+   331→│ Pan limit            │                                    │ Error               │
+   332→│ 5 °/s                │                                    │ 4.21 px             │
+   333→│                    │                                    │                     │
+   334→│ Disturbances         │                                    │ Pan +2.40 °/s       │
+   335→│ Gaussian ON          │                                    │ Tilt -0.80 °/s      │
+   336→│ Jitter ON            │                                    │                     │
+   337→├────────────────────┴────────────────────────────────────┴─────────────────────┤
+   338→│ ERROR / TRAJECTORY / LOCK TIMELINE                                             │
+   339→├────────────────────────────────────────────────────────────────────────────────┤
+   340→│ EVENT LOG                                                                       │
+   341→└────────────────────────────────────────────────────────────────────────────────┘
+   342→```
+   343→
+   344→---
+   345→
+   346→# 8. Camera Viewport
+   347→
+   348→This is the most important UI component.
+   349→
+   350→## 8.1 Camera View
+   351→
+   352→The viewport should feel like an actual scientific imaging monitor.
+   353→
+   354→Use:
+   355→- dark image area,
+   356→- very thin frame border,
+   357→- subtle crosshair,
+   358→- reticle ring,
+   359→- target box,
+   360→- target centroid,
+   361→- predicted centroid,
+   362→- optional ground-truth marker in development mode.
+   363→
+   364→Example:
+   365→
+   366→```text
+   367→┌────────────────────────────────────────────┐
+   368→│ CAM-01                         640×480      │
+   369→│                                            │
+   370→│                                            │
+   371→│                    ┌────┐                  │
+   372→│                    │  ✦ │                  │
+   373→│                    └─┬──┘                  │
+   374→│                      │ detection           │
+   375→│                      ○ prediction          │
+   376→│                                            │
+   377→│                         +                  │
+   378→│                       center               │
+   379→│                                            │
+   380→│ FOV 4.0° × 3.0°                 TRACK      │
+   381→└────────────────────────────────────────────┘
+   382→```
+   383→
+   384→## 8.2 Overlay Legend
+   385→
+   386→```text
+   387→✦ Beacon / detected centroid
+   388→○ Kalman predicted position
+   389→+ Desired camera center
+   390→□ Detection bounding box
+   391→┄ Ground truth (debug only)
+   392→```
+   393→
+   394→The legend must be subtle and compact.
+   395→
+   396→## 8.3 Camera HUD
+   397→
+   398→Top-left:
+   399→
+   400→```text
+   401→CAM-01
+   402→640 × 480
+   403→4.0° × 3.0°
+   404→30 Hz
+   405→```
+   406→
+   407→Top-right:
+   408→
+   409→```text
+   410→TRACK
+   411→CONF 0.97
+   412→```
+   413→
+   414→Bottom-left:
+   415→
+   416→```text
+   417→PAN   +12.42°
+   418→TILT   -3.81°
+   419→```
+   420→
+   421→Bottom-right:
+   422→
+   423→```text
+   424→ERR 4.21 px
+   425→```
+   426→
+   427→Do not put ten floating cards inside the viewport.
+   428→
+   429→---
+   430→
+   431→# 9. 3D Scene View
+   432→
+   433→The application should include a **real 3D spatial view**, but it must be technically useful.
+   434→
+   435→Use:
+   436→
+   437→```text
+   438→Three.js
+   439→@react-three/fiber
+   440→@react-three/drei
+   441→```
+   442→
+   443→The 3D view is an engineering visualization of:
+   444→
+   445→- target/beacon position,
+   446→- virtual camera pose,
+   447→- camera optical axis,
+   448→- FOV cone,
+   449→- target trajectory,
+   450→- pan/tilt orientation,
+   451→- world frame.
+   452→
+   453→## 9.1 3D Scene
+   454→
+   455→```text
+   456→                   ✦ Beacon
+   457→                  /|
+   458→                 / |
+   459→                /  |
+   460→           ····/···|···· trajectory
+   461→              /
+   462→             /
+   463→          ╱───────╲
+   464→         ╱  FOV    ╲
+   465→        ╱           ╲
+   466→       📷 Camera
+   467→```
+   468→
+   469→## 9.2 3D Objects
+   470→
+   471→### Camera
+   472→
+   473→Use a simple technical frustum model.
+   474→
+   475→### Beacon
+   476→
+   477→Use:
+   478→- tiny emissive core,
+   479→- restrained halo,
+   480→- no giant bloom.
+   481→
+   482→### FOV
+   483→
+   484→Transparent wireframe cone.
+   485→
+   486→### Target trajectory
+   487→
+   488→Thin line.
+   489→
+   490→### Ground plane
+   491→
+   492→Optional, very subtle grid.
+   493→
+   494→### Coordinate axes
+   495→
+   496→Small XYZ axis indicator.
+   497→
+   498→---
+   499→
+   500→# 10. Simulation Workspace
+   501→
+   502→The Simulation workspace should let the user configure a scenario without feeling like a giant form.
+   503→
+   504→Use grouped panels.
+   505→
+   506→## 10.1 Scenario
+   507→
+   508→```text
+   509→Scenario
+   510→──────────────────────────
+   511→Preset        Figure-8
+   512→Seed          42
+   513→Duration      60 s
+   514→```
+   515→
+   516→## 10.2 Camera
+   517→
+   518→```text
+   519→Camera
+   520→──────────────────────────
+   521→Resolution    640 × 480
+   522→FOV           4.0 × 3.0°
+   523→Update rate   30 Hz
+   524→Max pan       5 °/s
+   525→Max tilt      5 °/s
+   526→```
+   527→
+   528→## 10.3 Target
+   529→
+   530→```text
+   531→Beacon
+   532→──────────────────────────
+   533→Count         1
+   534→Size          10 × 10 px
+   535→Intensity     1.00
+   536→Start X       Random
+   537→Start Y       Random
+   538→Motion        Figure-8
+   539→Speed         1.2
+   540→```
+   541→
+   542→## 10.4 Disturbance
+   543→
+   544→```text
+   545→Disturbance
+   546→──────────────────────────
+   547→Gaussian       ON
+   548→Sigma          4 px
+   549→
+   550→Jitter         ON
+   551→Max            8 px/frame
+   552→
+   553→Atmosphere     Haze
+   554→Platform       Linear
+   555→```
+   556→
+   557→Fields should use compact controls and numeric steppers.
+   558→
+   559→Avoid giant sliders for exact engineering parameters.
+   560→
+   561→---
+   562→
+   563→# 11. Algorithm Panel
+   564→
+   565→The user must be able to see exactly which algorithm is running.
+   566→
+   567→```text
+   568→PERCEPTION
+   569→Detector
+   570→  ● Classical CV
+   571→  ○ AI
+   572→  ○ Fusion
+   573→
+   574→TRACKING
+   575→Tracker
+   576→  ● Kalman CV
+   577→
+   578→CONTROL
+   579→Controller
+   580→  ● PID Angle Space
+   581→
+   582→SEARCH
+   583→Pattern
+   584→  ● Raster
+   585→  ○ Spiral
+   586→```
+   587→
+   588→Show advanced parameters only when requested:
+   589→
+   590→```text
+   591→Advanced
+   592→──────────────
+   593→Threshold
+   594→Morphology
+   595→Min area
+   596→Max area
+   597→Kalman Q
+   598→Kalman R
+   599→Kp
+   600→Ki
+   601→Kd
+   602→Deadband
+   603→Prediction timeout
+   604→```
+   605→
+   606→Use disclosure sections.
+   607→
+   608→---
+   609→
+   610→# 12. Live Tracking Status
+   611→
+   612→The right telemetry panel is the "single source of truth" for run state.
+   613→
+   614→## 12.1 State Header
+   615→
+   616→Large but restrained:
+   617→
+   618→```text
+   619→● TRACK
+   620→```
+   621→
+   622→Below:
+   623→
+   624→```text
+   625→Beacon #01
+   626→Acquired 00:01.12
+   627→Track age 1,482 frames
+   628→```
+   629→
+   630→## 12.2 Position
+   631→
+   632→```text
+   633→POSITION
+   634→X          312.4 px
+   635→Y          228.9 px
+   636→VX          34.2 px/s
+   637→VY          -8.4 px/s
+   638→```
+   639→
+   640→## 12.3 Error
+   641→
+   642→```text
+   643→TRACKING ERROR
+   644→
+   645→4.21 px
+   646→```
+   647→
+   648→Below:
+   649→
+   650→```text
+   651→Target limit
+   652→≤ 10 px
+   653→```
+   654→
+   655→The official PS target should be visually distinct from internal thresholds.
+   656→
+   657→## 12.4 Control Output
+   658→
+   659→```text
+   660→CONTROL
+   661→
+   662→PAN       +2.40 °/s
+   663→TILT      -0.80 °/s
+   664→
+   665→LIMIT
+   666→PAN        5.00 °/s
+   667→TILT       5.00 °/s
+   668→```
+   669→
+   670→---
+   671→
+   672→# 13. Performance Cards
+   673→
+   674→Use a compact grid:
+   675→
+   676→```text
+   677→┌─────────────┬─────────────┬─────────────┐
+   678→│ FPS         │ AVG ERROR   │ LOCK        │
+   679→│ 48.6        │ 4.21 px     │ 97.1 %      │
+   680→├─────────────┼─────────────┼─────────────┤
+   681→│ ACQ         │ RE-ACQ      │ LOSS        │
+   682→│ 1.12 s      │ 0.54 s      │ 2.3 %       │
+   683→└─────────────┴─────────────┴─────────────┘
+   684→```
+   685→
+   686→Each card includes:
+   687→
+   688→- current value,
+   689→- unit,
+   690→- tiny trend indicator,
+   691→- benchmark status.
+   692→
+   693→Example:
+   694→
+   695→```text
+   696→FPS
+   697→48.6
+   698→✓ ≥ 20 FPS
+   699→```
+   700→
+   701→Never use huge "100/100" gamification.
+   702→
+   703→---
+   704→
+   705→# 14. Benchmark Compliance View
+   706→
+   707→Create a dedicated panel called:
+   708→
+   709→**PS-169 Benchmark**
+   710→
+   711→It should show the official requirements directly.
+   712→
+   713→```text
+   714→PS-169 BENCHMARK
+   715→
+   716→Acquisition Time
+   717→1.12 s
+   718→TARGET ≤ 2.00 s
+   719→PASS
+   720→
+   721→Average Tracking Error
+   722→4.21 px
+   723→TARGET ≤ 10 px
+   724→PASS
+   725→
+   726→Target Loss
+   727→2.30 %
+   728→TARGET < 5 %
+   729→PASS
+   730→
+   731→Re-acquisition
+   732→0.54 s
+   733→TARGET ≤ 1.00 s
+   734→PASS
+   735→
+   736→Algorithm FPS
+   737→48.6
+   738→TARGET ≥ 20 FPS
+   739→PASS
+   740→```
+   741→
+   742→Use restrained pass/fail indicators.
+   743→
+   744→This is especially important for the SIH demonstration.
+   745→
+   746→---
+   747→
+   748→# 15. Charts
+   749→
+   750→The frontend must prioritize engineering charts over decorative graphics.
+   751→
+   752→## 15.1 Tracking Error
+   753→
+   754→Line chart:
+   755→
+   756→```text
+   757→error px
+   758→ 20 │
+   759→ 15 │       ╭─╮
+   760→ 10 │───────┼─╰──── target
+   761→  5 │  ╭─╮  │
+   762→  0 │──╯ ╰────────────
+   763→     time →
+   764→```
+   765→
+   766→Show:
+   767→- current value,
+   768→- mean,
+   769→- max,
+   770→- official 10 px threshold.
+   771→
+   772→## 15.2 Target vs Camera Center
+   773→
+   774→Plot:
+   775→
+   776→```text
+   777→Ground truth
+   778→Detected
+   779→Prediction
+   780→Camera center
+   781→```
+   782→
+   783→This makes the controller behavior understandable.
+   784→
+   785→## 15.3 Lock Timeline
+   786→
+   787→Horizontal state strip:
+   788→
+   789→```text
+   790→SEARCH  ACQUIRE  TRACK──────────────  PREDICT  TRACK
+   791→```
+   792→
+   793→Use small state bands, not large colorful blocks.
+   794→
+   795→## 15.4 Pan/Tilt Output
+   796→
+   797→Two synchronized traces:
+   798→
+   799→```text
+   800→PAN rate
+   801→TILT rate
+   802→```
+   803→
+   804→Show configured limits.
+   805→
+   806→---
+   807→
+   808→# 16. Event Log
+   809→
+   810→The bottom log should behave like an engineering console.
+   811→
+   812→```text
+   813→14:02:31.012  INFO   Simulation started        run=0042
+   814→14:02:31.442  DETECT Beacon candidate          conf=0.92
+   815→14:02:31.712  STATE  CANDIDATE → ACQUIRE
+   816→14:02:32.124  STATE  ACQUIRE → TRACK
+   817→14:02:32.124  METRIC Acquisition              1.12s
+   818→14:02:36.820  DIST   Camera jitter             7.4px
+   819→14:02:37.014  TRACK  Prediction engaged
+   820→14:02:37.412  STATE  PREDICT → TRACK
+   821→```
+   822→
+   823→Use monospace.
+   824→
+   825→Provide:
+   826→- severity filter,
+   827→- search,
+   828→- pause/follow tail,
+   829→- copy,
+   830→- export.
+   831→
+   832→---
+   833→
+   834→# 17. Scenario Builder
+   835→
+   836→Provide a professional scenario-builder experience.
+   837→
+   838→## Scenario List
+   839→
+   840→```text
+   841→SCENARIOS
+   842→
+   843→PS169-01  Straight / Clear
+   844→PS169-02  Circular / Clear
+   845→PS169-03  Figure-8 / Clear
+   846→PS169-04  Random / Clear
+   847→PS169-05  Gaussian Noise
+   848→PS169-06  Salt & Pepper
+   849→PS169-07  Poisson
+   850→PS169-08  Camera Jitter
+   851→PS169-09  Haze
+   852→PS169-10  Fog
+   853→PS169-11  Rain
+   854→PS169-12  Low Light
+   855→PS169-13  Platform Motion
+   856→PS169-14  High Disturbance
+   857→```
+   858→
+   859→Each scenario should show:
+   860→- seed,
+   861→- duration,
+   862→- disturbance profile,
+   863→- expected difficulty.
+   864→
+   865→---
+   866→
+   867→# 18. Video Benchmark Mode
+   868→
+   869→The external MP4 mode must be visually distinct from simulation.
+   870→
+   871→Header:
+   872→
+   873→```text
+   874→VIDEO BENCHMARK
+   875→External 30 FPS MP4
+   876→```
+   877→
+   878→## Input Area
+   879→
+   880→```text
+   881→┌───────────────────────────────────────┐
+   882→│ Drop MP4 here                         │
+   883→│                                       │
+   884→│ or                                    │
+   885→│ [Choose video]                        │
+   886→└───────────────────────────────────────┘
+   887→```
+   888→
+   889→After loading:
+   890→
+   891→```text
+   892→sample_test_01.mp4
+   893→1920 × 1080
+   894→30.00 FPS
+   895→Duration 45.2 s
+   896→```
+   897→
+   898→## Ground Truth Status
+   899→
+   900→Clearly show:
+   901→
+   902→```text
+   903→GROUND TRUTH
+   904→● Known GT
+   905→```
+   906→
+   907→or:
+   908→
+   909→```text
+   910→GROUND TRUTH
+   911→● Manual annotation required
+   912→```
+   913→
+   914→or:
+   915→
+   916→```text
+   917→GROUND TRUTH
+   918→● Not available
+   919→Perception-only metrics
+   920→```
+   921→
+   922→When no ground truth exists, do not fake tracking-error numbers.
+   923→
+   924→Show reference-free metrics instead.
+   925→
+   926→---
+   927→
+   928→# 19. Manual Annotation UI
+   929→
+   930→For video with no ground truth:
+   931→
+   932→```text
+   933→FRAME 120 / 1356
+   934→
+   935→              ✦
+   936→           Click beacon
+   937→```
+   938→
+   939→Tools:
+   940→
+   941→```text
+   942→[Previous]
+   943→[Next]
+   944→[Mark Point]
+   945→[Clear]
+   946→[Save GT]
+   947→```
+   948→
+   949→Show an annotation timeline below.
+   950→
+   951→Sparse annotations may be interpolated for internal analysis.
+   952→
+   953→The UI must clearly label such results as:
+   954→
+   955→```text
+   956→MANUALLY ANNOTATED GROUND TRUTH
+   957→```
+   958→
+   959→Never present it as official evaluator ground truth.
+   960→
+   961→---
+   962→
+   963→# 20. Results Screen
+   964→
+   965→After a run:
+   966→
+   967→```text
+   968→RUN COMPLETE
+   969→Figure-8 + Haze
+   970→Run #0042
+   971→```
+   972→
+   973→Then:
+   974→
+   975→### Summary
+   976→
+   977→```text
+   978→Acquisition       1.12 s
+   979→Average Error     4.21 px
+   980→RMSE              5.63 px
+   981→Loss              2.30 %
+   982→Re-acquisition    0.54 s
+   983→Algorithm FPS     48.4
+   984→```
+   985→
+   986→### Benchmark
+   987→
+   988→```text
+   989→PS-169
+   990→5 / 5 targets passed
+   991→```
+   992→
+   993→### Visuals
+   994→
+   995→- tracking error chart,
+   996→- lock timeline,
+   997→- target/camera trajectory,
+   998→- pan/tilt commands.
+   999→
+  1000→### Actions
+  1001→
+  1002→```text
+  1003→[Export JSON]
+  1004→[Export CSV]
+  1005→[Export HTML]
+  1006→[Replay]
+  1007→[Compare]
+  1008→```
+  1009→
+  1010→---
+  1011→
+  1012→# 21. Replay Experience
+  1013→
+  1014→Replay should not re-run the simulation.
+  1015→
+  1016→It should reconstruct the run from recorded event data.
+  1017→
+  1018→```text
+  1019→RUN #0042
+  1020→00:00 ────────────●──────────── 01:00
+  1021→
+  1022→▶ Play     ◀ 10f     10f ▶
+  1023→```
+  1024→
+  1025→Camera viewport replays:
+  1026→- detection,
+  1027→- prediction,
+  1028→- target,
+  1029→- center,
+  1030→- state,
+  1031→- controller output.
+  1032→
+  1033→Optional side panel:
+  1034→
+  1035→```text
+  1036→Frame 1823
+  1037→GT           311.0, 229.0
+  1038→Detected     312.4, 228.9
+  1039→Predicted    311.8, 229.3
+  1040→Error        4.21 px
+  1041→State        TRACK
+  1042→Pan          +2.40 °/s
+  1043→```
+  1044→
+  1045→---
+  1046→
+  1047→# 22. Experiment Comparison
+  1048→
+  1049→Provide a technical comparison table:
+  1050→
+  1051→```text
+  1052→                     RUN A         RUN B        Δ
+  1053→-------------------------------------------------------
+  1054→Detector             Classical      AI           -
+  1055→Avg Error             5.82 px        4.21 px      -27.7%
+  1056→RMSE                  7.10 px        5.63 px      -20.7%
+  1057→Loss                  6.2 %          2.3 %        -3.9 pp
+  1058→Acquisition           1.42 s         1.12 s       -0.30 s
+  1059→FPS                   61.2           48.4         -12.8
+  1060→```
+  1061→
+  1062→This supports algorithm experiments.
+  1063→
+  1064→---
+  1065→
+  1066→# 23. 3D Motion Visualization
+  1067→
+  1068→The 3D environment should not become a game.
+  1069→
+  1070→## Camera controls
+  1071→
+  1072→- orbit
+  1073→- pan
+  1074→- zoom
+  1075→- reset
+  1076→- top/front/side views
+  1077→
+  1078→## Optional layers
+  1079→
+  1080→```text
+  1081→☑ FOV
+  1082→☑ Target trajectory
+  1083→☑ Ground truth
+  1084→☑ Camera axis
+  1085→☐ Grid
+  1086→☐ Platform motion
+  1087→```
+  1088→
+  1089→## Camera Frustum
+  1090→
+  1091→Use the actual configured FOV.
+  1092→
+  1093→The visualization must update when FOV changes.
+  1094→
+  1095→---
+  1096→
+  1097→# 24. Animation Rules
+  1098→
+  1099→The frontend should have motion, but motion must explain the system.
+  1100→
+  1101→## Good motion
+  1102→
+  1103→- beacon movement,
+  1104→- camera frustum rotation,
+  1105→- pan/tilt orientation,
+  1106→- chart streaming,
+  1107→- state transition,
+  1108→- target acquisition ring,
+  1109→- subtle viewport reticle animation.
+  1110→
+  1111→## Bad motion
+  1112→
+  1113→- floating cards,
+  1114→- bouncing buttons,
+  1115→- arbitrary background particles,
+  1116→- continuous glow pulses,
+  1117→- overdone page transitions.
+  1118→
+  1119→### Timing
+  1120→
+  1121→```text
+  1122→micro interaction: 100–160 ms
+  1123→panel transition:   180–240 ms
+  1124→major state change: 250–400 ms
+  1125→```
+  1126→
+  1127→Use easing that feels mechanical and controlled.
+  1128→
+  1129→---
+  1130→
+  1131→# 25. 3D Landing / Welcome Screen
+  1132→
+  1133→A welcome screen is allowed, but keep it extremely minimal.
+  1134→
+  1135→It should not look like a SaaS landing page.
+  1136→
+  1137→Example:
+  1138→
+  1139→```text
+  1140→FSOC-PAT
+  1141→Virtual Coarse Alignment Laboratory
+  1142→
+  1143→Software environment for simulation,
+  1144→visual tracking and coarse optical alignment.
+  1145→
+  1146→[Launch Laboratory]
+  1147→
+  1148→System
+  1149→Simulation
+  1150→Video Benchmark
+  1151→Results
+  1152→```
+  1153→
+  1154→Behind it:
+  1155→
+  1156→A very subtle animated 3D camera frustum and moving beacon.
+  1157→
+  1158→No:
+  1159→- huge hero text,
+  1160→- stock satellite image,
+  1161→- glowing earth,
+  1162→- generic AI brain graphic.
+  1163→
+  1164→---
+  1165→
+  1166→# 26. Empty States
+  1167→
+  1168→Every empty state must teach the user what to do.
+  1169→
+  1170→Example:
+  1171→
+  1172→```text
+  1173→NO ACTIVE RUN
+  1174→
+  1175→Create or select a simulation scenario
+  1176→to begin coarse-alignment tracking.
+  1177→
+  1178→[Open Scenarios]
+  1179→```
+  1180→
+  1181→Video:
+  1182→
+  1183→```text
+  1184→NO VIDEO LOADED
+  1185→
+  1186→Load a 30-FPS MP4 benchmark video
+  1187→to start perception analysis.
+  1188→
+  1189→[Choose Video]
+  1190→```
+  1191→
+  1192→---
+  1193→
+  1194→# 27. Loading States
+  1195→
+  1196→Never show a generic "Loading...".
+  1197→
+  1198→Use contextual language:
+  1199→
+  1200→```text
+  1201→Initializing virtual camera...
+  1202→Generating deterministic trajectory...
+  1203→Preparing disturbance chain...
+  1204→Starting detector...
+  1205→```
+  1206→
+  1207→For model loading:
+  1208→
+  1209→```text
+  1210→Loading AI detector
+  1211→42 MB / 78 MB
+  1212→```
+  1213→
+  1214→---
+  1215→
+  1216→# 28. Error Handling
+  1217→
+  1218→Errors must be actionable.
+  1219→
+  1220→Bad:
+  1221→
+  1222→```text
+  1223→Something went wrong.
+  1224→```
+  1225→
+  1226→Good:
+  1227→
+  1228→```text
+  1229→Unable to start simulation
+  1230→
+  1231→Camera FOV must be greater than 0°.
+  1232→
+  1233→Field: Camera → FOV
+  1234→
+  1235→[Fix parameter]
+  1236→```
+  1237→
+  1238→For video:
+  1239→
+  1240→```text
+  1241→Unsupported video
+  1242→
+  1243→Expected:
+  1244→MP4
+  1245→Readable video stream
+  1246→Nominal 30 FPS
+  1247→
+  1248→Detected:
+  1249→codec unsupported
+  1250→```
+  1251→
+  1252→---
+  1253→
+  1254→# 29. Accessibility
+  1255→
+  1256→The engineering interface must not depend only on color.
+  1257→
+  1258→Every state uses:
+  1259→
+  1260→- icon,
+  1261→- label,
+  1262→- color.
+  1263→
+  1264→Example:
+  1265→
+  1266→```text
+  1267→✓ PASS
+  1268→! WARNING
+  1269→× FAIL
+  1270→● ACTIVE
+  1271→```
+  1272→
+  1273→Keyboard shortcuts:
+  1274→
+  1275→```text
+  1276→Space       Start/Pause
+  1277→Esc         Stop
+  1278→R           Reset camera
+  1279→L           Toggle logs
+  1280→G           Toggle ground truth
+  1281→C           Toggle controls
+  1282→1           Camera view
+  1283→2           3D scene
+  1284→3           Analytics
+  1285→```
+  1286→
+  1287→---
+  1288→
+  1289→# 30. Technical Stack
+  1290→
+  1291→Recommended frontend:
+  1292→
+  1293→```text
+  1294→Next.js 15+
+  1295→TypeScript
+  1296→Tailwind CSS
+  1297→shadcn/ui (used selectively, not wholesale)
+  1298→Lucide icons
+  1299→React Three Fiber
+  1300→Three.js
+  1301→Recharts
+  1302→Zustand
+  1303→Zod
+  1304→```
+  1305→
+  1306→Optional:
+  1307→
+  1308→```text
+  1309→Framer Motion
+  1310→```
+  1311→
+  1312→Use Framer Motion only for purposeful transitions.
+  1313→
+  1314→## Rendering
+  1315→
+  1316→Primary 3D:
+  1317→
+  1318→```text
+  1319→@react-three/fiber
+  1320→@react-three/drei
+  1321→three
+  1322→```
+  1323→
+  1324→Charts:
+  1325→
+  1326→```text
+  1327→Recharts
+  1328→```
+  1329→
+  1330→State:
+  1331→
+  1332→```text
+  1333→Zustand
+  1334→```
+  1335→
+  1336→Validation:
+  1337→
+  1338→```text
+  1339→Zod
+  1340→```
+  1341→
+  1342→---
+  1343→
+  1344→# 31. Frontend Architecture
+  1345→
+  1346→```text
+  1347→app/
+  1348→├── layout.tsx
+  1349→├── page.tsx
+  1350→├── laboratory/
+  1351→│   ├── page.tsx
+  1352→│   ├── simulation/
+  1353→│   ├── benchmark/
+  1354→│   ├── analytics/
+  1355→│   ├── replay/
+  1356→│   └── scenarios/
+  1357→│
+  1358→components/
+  1359→├── shell/
+  1360→│   ├── top-bar.tsx
+  1361→│   ├── command-rail.tsx
+  1362→│   └── status-bar.tsx
+  1363→│
+  1364→├── camera/
+  1365→│   ├── camera-viewport.tsx
+  1366→│   ├── camera-overlay.tsx
+  1367→│   ├── reticle.tsx
+  1368→│   └── telemetry-hud.tsx
+  1369→│
+  1370→├── scene/
+  1371→│   ├── scene-3d.tsx
+  1372→│   ├── beacon.tsx
+  1373→│   ├── camera-frustum.tsx
+  1374→│   ├── trajectory-line.tsx
+  1375→│   └── scene-controls.tsx
+  1376→│
+  1377→├── controls/
+  1378→│   ├── scenario-panel.tsx
+  1379→│   ├── camera-panel.tsx
+  1380→│   ├── beacon-panel.tsx
+  1381→│   ├── disturbance-panel.tsx
+  1382→│   └── algorithm-panel.tsx
+  1383→│
+  1384→├── telemetry/
+  1385→│   ├── tracking-status.tsx
+  1386→│   ├── performance-cards.tsx
+  1387→│   ├── benchmark-panel.tsx
+  1388→│   └── control-output.tsx
+  1389→│
+  1390→├── charts/
+  1391→│   ├── tracking-error-chart.tsx
+  1392→│   ├── lock-timeline.tsx
+  1393→│   ├── trajectory-chart.tsx
+  1394→│   └── control-output-chart.tsx
+  1395→│
+  1396→├── logs/
+  1397→│   ├── event-log.tsx
+  1398→│   └── log-filters.tsx
+  1399→│
+  1400→├── results/
+  1401→│   ├── results-summary.tsx
+  1402→│   ├── pass-fail-table.tsx
+  1403→│   ├── report-actions.tsx
+  1404→│   └── comparison-table.tsx
+  1405→│
+  1406→└── ui/
+  1407→    ├── button.tsx
+  1408→    ├── input.tsx
+  1409→    ├── select.tsx
+  1410→    ├── slider.tsx
+  1411→    └── panel.tsx
+  1412→```
+  1413→
+  1414→---
+  1415→
+  1416→# 32. State Model
+  1417→
+  1418→The frontend should mirror the backend state machine exactly.
+  1419→
+  1420→```text
+  1421→SEARCH
+  1422→CANDIDATE
+  1423→ACQUIRE
+  1424→TRACK
+  1425→PREDICT_REACQUIRE
+  1426→```
+  1427→
+  1428→Do not invent a different UI state naming system.
+  1429→
+  1430→Example:
+  1431→
+  1432→```text
+  1433→Backend:
+  1434→PREDICT_REACQUIRE
+  1435→
+  1436→Frontend:
+  1437→PREDICT / REACQUIRE
+  1438→```
+  1439→
+  1440→The mapping must remain one-to-one.
+  1441→
+  1442→---
+  1443→
+  1444→# 33. Frontend Data Contracts
+  1445→
+  1446→The frontend should consume typed objects that mirror the backend contracts.
+  1447→
+  1448→Example:
+  1449→
+  1450→```ts
+  1451→type Detection = {
+  1452→  found: boolean
+  1453→  x: number | null
+  1454→  y: number | null
+  1455→  confidence: number
+  1456→  bbox: [number, number, number, number] | null
+  1457→  method: "cv" | "ai" | "fusion"
+  1458→  latency_ms: number
+  1459→}
+  1460→
+  1461→type TrackState = {
+  1462→  state:
+  1463→    | "SEARCH"
+  1464→    | "CANDIDATE"
+  1465→    | "ACQUIRE"
+  1466→    | "TRACK"
+  1467→    | "PREDICT_REACQUIRE"
+  1468→
+  1469→  x: number | null
+  1470→  y: number | null
+  1471→  vx: number | null
+  1472→  vy: number | null
+  1473→  confidence: number
+  1474→  track_age_frames: number
+  1475→  lost_frames_consecutive: number
+  1476→  is_prediction: boolean
+  1477→}
+  1478→
+  1479→type PanTiltCommand = {
+  1480→  pan_deg_s: number
+  1481→  tilt_deg_s: number
+  1482→}
+  1483→```
+  1484→
+  1485→The frontend must not silently rename units.
+  1486→
+  1487→---
+  1488→
+  1489→# 34. Live Data Transport
+  1490→
+  1491→The preferred integration pattern is:
+  1492→
+  1493→```text
+  1494→Simulation / Python Engine
+  1495→        │
+  1496→        ▼
+  1497→Typed Event Stream
+  1498→        │
+  1499→        ▼
+  1500→Frontend Adapter
+  1501→        │
+  1502→        ▼
+  1503→Zustand Store
+  1504→        │
+  1505→        ├── Camera View
+  1506→        ├── Telemetry
+  1507→        ├── Charts
+  1508→        └── Event Log
+  1509→```
+  1510→
+  1511→Possible transport options:
+  1512→
+  1513→### Development
+  1514→
+  1515→WebSocket / local event server.
+  1516→
+  1517→### Desktop integration
+  1518→
+  1519→Local bridge between Next.js frontend and Python process.
+  1520→
+  1521→### Future embedded desktop
+  1522→
+  1523→Tauri/Electron shell around Next.js.
+  1524→
+  1525→The frontend must not hard-code transport assumptions into visual components.
+  1526→
+  1527→---
+  1528→
+  1529→# 35. Performance Requirements
+  1530→
+  1531→The UI must remain responsive while the simulation runs at ≥20 FPS processing speed and a default camera update rate of 30 Hz.
+  1532→
+  1533→Important rule:
+  1534→
+  1535→**Do not render every raw backend event directly into React state.**
+  1536→
+  1537→Use:
+  1538→- sampled chart updates,
+  1539→- buffered telemetry,
+  1540→- requestAnimationFrame for viewport animation,
+  1541→- throttled event-log rendering,
+  1542→- memoized charts.
+  1543→
+  1544→Target UI performance:
+  1545→
+  1546→```text
+  1547→60 FPS visual interaction
+  1548→No visible UI freeze during simulation
+  1549→No uncontrolled DOM growth
+  1550→```
+  1551→
+  1552→---
+  1553→
+  1554→# 36. Responsive Behavior
+  1555→
+  1556→Primary target:
+  1557→
+  1558→```text
+  1559→1440 × 900 and above
+  1560→```
+  1561→
+  1562→At 1200–1439 px:
+  1563→
+  1564→```text
+  1565→collapse left control groups
+  1566→maintain camera viewport
+  1567→```
+  1568→
+  1569→Below 1100 px:
+  1570→
+  1571→```text
+  1572→three columns → two columns
+  1573→```
+  1574→
+  1575→Below 850 px:
+  1576→
+  1577→```text
+  1578→desktop warning:
+  1579→"FSOC-PAT Laboratory is optimized for desktop engineering workflows."
+  1580→```
+  1581→
+  1582→Do not redesign the application into a mobile card dashboard.
+  1583→
+  1584→---
+  1585→
+  1586→# 37. Dark Theme Details
+  1587→
+  1588→Panels should be visually separated without obvious cards everywhere.
+  1589→
+  1590→Example surfaces:
+  1591→
+  1592→```text
+  1593→Application       #0a0d10
+  1594→Panel              #0e1216
+  1595→Elevated panel     #13181d
+  1596→Hover              #181f25
+  1597→Border             #252c33
+  1598→```
+  1599→
+  1600→Use hairline borders.
+  1601→
+  1602→Panel radius:
+  1603→
+  1604→```text
+  1605→8px–12px
+  1606→```
+  1607→
+  1608→Avoid:
+  1609→
+  1610→```text
+  1611→20px+
+  1612→```
+  1613→
+  1614→because that makes the UI feel like consumer SaaS.
+  1615→
+  1616→---
+  1617→
+  1618→# 38. Design Tokens
+  1619→
+  1620→```ts
+  1621→export const spacing = {
+  1622→  xs: 4,
+  1623→  sm: 8,
+  1624→  md: 12,
+  1625→  lg: 16,
+  1626→  xl: 24,
+  1627→  "2xl": 32,
+  1628→}
+  1629→
+  1630→export const radius = {
+  1631→  sm: 6,
+  1632→  md: 8,
+  1633→  lg: 12,
+  1634→}
+  1635→
+  1636→export const typography = {
+  1637→  label: "12px",
+  1638→  body: "14px",
+  1639→  value: "22px",
+  1640→  heroValue: "32px",
+  1641→}
+  1642→```
+  1643→
+  1644→---
+  1645→
+  1646→# 39. Component Rules
+  1647→
+  1648→## Buttons
+  1649→
+  1650→Primary:
+  1651→
+  1652→```text
+  1653→Start Run
+  1654→```
+  1655→
+  1656→Secondary:
+  1657→
+  1658→```text
+  1659→Pause
+  1660→Reset
+  1661→Save Scenario
+  1662→```
+  1663→
+  1664→Danger:
+  1665→
+  1666→```text
+  1667→Stop Run
+  1668→```
+  1669→
+  1670→Do not make every action a filled button.
+  1671→
+  1672→## Inputs
+  1673→
+  1674→Use compact engineering controls.
+  1675→
+  1676→Good:
+  1677→
+  1678→```text
+  1679→FOV
+  1680→[ 4.0 ] ° × [ 3.0 ] °
+  1681→```
+  1682→
+  1683→Bad:
+  1684→
+  1685→```text
+  1686→FOV
+  1687→[giant rounded card slider]
+  1688→```
+  1689→
+  1690→## Tooltips
+  1691→
+  1692→Use for advanced concepts:
+  1693→
+  1694→- FOV
+  1695→- acquisition timeout
+  1696→- prediction timeout
+  1697→- Kalman Q/R
+  1698→- lock radius
+  1699→
+  1700→---
+  1701→
+  1702→# 40. Beacon Visualization
+  1703→
+  1704→The beacon should be one of the strongest visual signals.
+  1705→
+  1706→In 2D:
+  1707→
+  1708→```text
+  1709→       ✦
+  1710→     ╱   ╲
+  1711→    │  ●  │
+  1712→     ╲   ╱
+  1713→```
+  1714→
+  1715→In 3D:
+  1716→- central emissive point,
+  1717→- small halo,
+  1718→- no exaggerated bloom.
+  1719→
+  1720→When detected:
+  1721→
+  1722→```text
+  1723→BEACON ACQUIRED
+  1724→```
+  1725→
+  1726→show a short acquisition ring animation.
+  1727→
+  1728→When lost:
+  1729→
+  1730→```text
+  1731→TARGET LOST
+  1732→```
+  1733→
+  1734→use a brief red state transition, then return to neutral tracking colors.
+  1735→
+  1736→---
+  1737→
+  1738→# 41. Target Tracking Demonstration Mode
+  1739→
+  1740→Add a toggle:
+  1741→
+  1742→```text
+  1743→DEBUG OVERLAY
+  1744→☑ Ground truth
+  1745→☑ Detection
+  1746→☑ Prediction
+  1747→☑ Camera center
+  1748→☑ FOV
+  1749→```
+  1750→
+  1751→This is important for development and judge demonstration.
+  1752→
+  1753→A judge should be able to see:
+  1754→
+  1755→```text
+  1756→ground truth ✕
+  1757→detected      ○
+  1758→prediction    △
+  1759→camera center +
+  1760→```
+  1761→
+  1762→in one view.
+  1763→
+  1764→---
+  1765→
+  1766→# 42. "Proof of Work" Mode
+  1767→
+  1768→Create a dedicated optional panel called:
+  1769→
+  1770→**Tracking Proof**
+  1771→
+  1772→It shows:
+  1773→
+  1774→```text
+  1775→GROUND TRUTH
+  1776→      ✕
+  1777→      │
+  1778→DETECTED
+  1779→      ○
+  1780→      │
+  1781→PREDICTED
+  1782→      △
+  1783→      │
+  1784→CAMERA CENTER
+  1785→      +
+  1786→```
+  1787→
+  1788→And:
+  1789→
+  1790→```text
+  1791→Pixel error        4.21 px
+  1792→Angular error      0.026°
+  1793→Prediction residual 1.8 px
+  1794→Controller output  +2.40 °/s
+  1795→```
+  1796→
+  1797→The goal is to visually prove that the pipeline is functioning.
+  1798→
+  1799→---
+  1800→
+  1801→# 43. PS-169 Compliance Display
+  1802→
+  1803→Use a persistent benchmark badge:
+  1804→
+  1805→```text
+  1806→PS-169
+  1807→4 / 5 PASS
+  1808→```
+  1809→
+  1810→Clicking it opens the complete compliance table.
+  1811→
+  1812→Never claim compliance when a metric is not computable.
+  1813→
+  1814→---
+  1815→
+  1816→# 44. Design for Demo Day
+  1817→
+  1818→The default demo flow should be:
+  1819→
+  1820→```text
+  1821→1. Open FSOC-PAT
+  1822→2. Choose PS-169 Figure-8 scenario
+  1823→3. Click Start
+  1824→4. Beacon enters camera FOV
+  1825→5. Detection appears
+  1826→6. State becomes TRACK
+  1827→7. Camera follows target
+  1828→8. Enable jitter + Gaussian noise
+  1829→9. Error increases briefly
+  1830→10. Kalman prediction activates
+  1831→11. Target is reacquired
+  1832→12. Results show metrics
+  1833→13. Open PS-169 benchmark panel
+  1834→14. Export report
+  1835→15. Load external MP4 benchmark
+  1836→16. Run perception pipeline
+  1837→```
+  1838→
+  1839→The UI should allow this without navigating through many screens.
+  1840→
+  1841→---
+  1842→
+  1843→# 45. What the Design Must NOT Look Like
+  1844→
+  1845→Avoid a visual style like:
+  1846→
+  1847→```text
+  1848→Huge gradient hero
+  1849→+
+  1850→glass cards
+  1851→+
+  1852→purple AI glow
+  1853→+
+  1854→3D earth
+  1855→+
+  1856→floating orb
+  1857→+
+  1858→random graphs
+  1859→+
+  1860→"AI POWERED" badges
+  1861→```
+  1862→
+  1863→That will look like a generated portfolio project.
+  1864→
+  1865→Instead:
+  1866→
+  1867→```text
+  1868→Dark engineering console
+  1869→+
+  1870→camera viewport
+  1871→+
+  1872→3D optical frustum
+  1873→+
+  1874→measured telemetry
+  1875→+
+  1876→precise controls
+  1877→+
+  1878→scientific charts
+  1879→+
+  1880→event stream
+  1881→+
+  1882→benchmark evidence
+  1883→```
+  1884→
+  1885→This is the intended visual identity.
+  1886→
+  1887→---
+  1888→
+  1889→# 46. Suggested Page Map
+  1890→
+  1891→```text
+  1892→/
+  1893→└── Launch / System Overview
+  1894→
+  1895→/laboratory
+  1896→└── Main live operations dashboard
+  1897→
+  1898→/laboratory/scenarios
+  1899→└── Scenario library + builder
+  1900→
+  1901→/laboratory/benchmark
+  1902→└── MP4 benchmark mode
+  1903→
+  1904→/laboratory/analytics
+  1905→└── Results + metrics
+  1906→
+  1907→/laboratory/replay
+  1908→└── Historical run replay
+  1909→
+  1910→/laboratory/comparison
+  1911→└── Run-to-run comparison
+  1912→
+  1913→/settings
+  1914→└── Application configuration
+  1915→```
+  1916→
+  1917→---
+  1918→
+  1919→# 47. Final Frontend Architecture
+  1920→
+  1921→```text
+  1922→                         FSOC-PAT FRONTEND
+  1923→                                │
+  1924→                         Next.js + TypeScript
+  1925→                                │
+  1926→             ┌──────────────────┼──────────────────┐
+  1927→             │                  │                  │
+  1928→             ▼                  ▼                  ▼
+  1929→         2D Camera           3D Scene          Telemetry
+  1930→         Viewport             Viewer             HUD
+  1931→             │                  │                  │
+  1932→             └──────────────────┼──────────────────┘
+  1933→                                │
+  1934→                         Zustand Store
+  1935→                                │
+  1936→         ┌──────────────────────┼──────────────────────┐
+  1937→         │                      │                      │
+  1938→         ▼                      ▼                      ▼
+  1939→      Detector               Tracker               Controller
+  1940→      events                events                 commands
+  1941→         │                      │                      │
+  1942→         └──────────────────────┼──────────────────────┘
+  1943→                                │
+  1944→                           Metrics Engine
+  1945→                                │
+  1946→                   ┌────────────┴────────────┐
+  1947→                   ▼                         ▼
+  1948→                Charts                  Event Log
+  1949→                   │                         │
+  1950→                   └────────────┬────────────┘
+  1951→                                ▼
+  1952→                           Run Results
+  1953→                                │
+  1954→                  ┌─────────────┼─────────────┐
+  1955→                  ▼             ▼             ▼
+  1956→                JSON          CSV          HTML
+  1957→```
+  1958→
+  1959→---
+  1960→
+  1961→# 48. Definition of Frontend Done
+  1962→
+  1963→The frontend is considered complete when:
+  1964→
+  1965→- The main dashboard clearly shows the live camera feed.
+  1966→- The moving beacon is visually obvious.
+  1967→- Detection, prediction and camera center overlays are visible.
+  1968→- Camera pan/tilt movement is visible.
+  1969→- Simulation controls are configurable without editing files.
+  1970→- Disturbances can be enabled/disabled from the UI.
+  1971→- SEARCH/CANDIDATE/ACQUIRE/TRACK/PREDICT_REACQUIRE state is visible.
+  1972→- FPS, acquisition, error, lock, loss, reacquisition and processing metrics are visible.
+  1973→- PS-169 benchmark targets are displayed separately from internal thresholds.
+  1974→- Error and trajectory charts update during runs.
+  1975→- Event logs show meaningful state transitions.
+  1976→- Results can be exported.
+  1977→- MP4 benchmark mode is accessible.
+  1978→- Ground-truth availability is explicitly communicated.
+  1979→- Replay can visualize a completed run.
+  1980→- The 3D view shows camera pose, FOV, beacon and trajectory.
+  1981→- The application never implies that recorded MP4 footage was physically re-pointed.
+  1982→- The UI remains responsive during a live run.
+  1983→- The visual language looks like professional engineering software rather than a generic AI/SaaS dashboard.
+  1984→
+  1985→---
+  1986→
+  1987→# 49. Final Design Statement
+  1988→
+  1989→FSOC-PAT should feel like a **virtual optical tracking laboratory**.
+  1990→
+  1991→The central visual story is:
+  1992→
+  1993→```text
+  1994→SCENE
+  1995→  ↓
+  1996→BEACON
+  1997→  ↓
+  1998→CAMERA
+  1999→  ↓
+  2000→DETECTION
+
+[showing lines 1-2000 of 2016; use offset=2001 with limit to continue reading]
