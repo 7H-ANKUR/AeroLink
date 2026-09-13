@@ -31,8 +31,8 @@ function runCase(label: string, blinkPeriodS: number): Outcome {
   const cfg = validateConfig({ ...base, seed, durationS: 45, beacon: { ...base.beacon, blinkPeriodS } });
   if (!cfg.ok) process.exit(1);
   const config = cfg.config;
-  const sceneData = initScene(config.scene.width, config.scene.height, config.scene.backgroundLevel, config.scene.distractorCount, config.seed, { x: config.beacon.startX, y: config.beacon.beaconStartY ?? config.scene.height / 2 });
-  const trajectory = createTrajectory({ mode: config.beacon.motion, speed: config.beacon.speed, sceneWidth: config.scene.width, sceneHeight: config.scene.height, startX: config.beacon.startX ?? sceneData.startX, startY: config.beacon.beaconStartY ?? sceneData.startY, margin: 80, rng: makeRng(config.seed ^ 0x1234abcd) });
+  const sceneData = initScene(config.scene.width, config.scene.height, config.scene.backgroundLevel, config.scene.distractorCount, config.seed, { x: config.beacon.startX, y: config.beacon.startY ?? config.scene.height / 2 });
+  const trajectory = createTrajectory({ mode: config.beacon.motion, speed: config.beacon.speed, sceneWidth: config.scene.width, sceneHeight: config.scene.height, startX: config.beacon.startX ?? sceneData.startX, startY: config.beacon.startY ?? sceneData.startY, margin: 80, rng: makeRng(config.seed ^ 0x1234abcd) });
   const camera = createCamera({ maxPanSpeedDegS: config.camera.maxPanSpeedDegS, maxTiltSpeedDegS: config.camera.maxTiltSpeedDegS, resolutionWidth: config.camera.resolutionWidth, resolutionHeight: config.camera.resolutionHeight, sceneWidth: config.scene.width, sceneHeight: config.scene.height, fovXDeg: config.camera.fovXDeg, fovYDeg: config.camera.fovYDeg });
   const beacon = makeBeacon(1, sceneData.startX, sceneData.startY, config.beacon.intensity);
   const rngMain = makeRng(config.seed);
@@ -73,14 +73,14 @@ function runCase(label: string, blinkPeriodS: number): Outcome {
     pipeline.step({ frame: frameBuf, width: w, height: h, timestamp_s: t, frame_index: fi, ground_truth: { ...beacon, x_px: beacon.x_px - (cc.cx - w / 2), y_px: beacon.y_px - (cc.cy - h / 2) }, pan_deg: camera.pan_deg, tilt_deg: camera.tilt_deg });
   }
   const r = pipeline.getMetrics().finalize(label);
-  const pass = r.pass_fail as Record<string, boolean>;
+  const pass = (r.pass_fail ?? {}) as unknown as Record<string, boolean>;
   const postVisLatencies: number[] = [];
   // For each reacquisition, find the moment the beacon became visible again and measure latency from THERE.
   void visWindows; void postVisLatencies; void lossTimes; void gauss;
   console.log(`\n[${label}] blinkPeriodS=${blinkPeriodS} (off ${(blinkPeriodS * offFrac).toFixed(2)}s each cycle)`);
   console.log(`  reacq events=${r.reacquisition_events} avg=${r.reacquisition_avg_s?.toFixed(3) ?? '—'}s max=${r.reacquisition_max_s?.toFixed(3) ?? '—'}s loss=${r.target_loss_percent}% lock=${r.lock_retention_percent}%`);
   console.log(`  gates: ${JSON.stringify(pass)}`);
-  return { lossTimes, reacqTimes, passFail: pass, reacqAvg: r.reacquisition_avg_s, reacqEvents: r.reacquisition_events, lossPct: r.target_loss_percent };
+  return { lossTimes, reacqTimes, passFail: pass, reacqAvg: r.reacquisition_avg_s, reacqEvents: r.reacquisition_events, lossPct: r.target_loss_percent ?? 0 };
 }
 
 console.log('=== FSOC-PAT Re-acquisition gate verification (PS-169: <= 1 s avg) ===');

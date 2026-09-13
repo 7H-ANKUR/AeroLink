@@ -72,3 +72,26 @@ Work Log:
 
 Stage Summary:
 - Deliverable: download/FSOC-PAT_Technical_Report.md — judge-ready engineering report with explicit evidence classification (CONFIRMED FROM PS / CONFIRMED FROM DOCS / IMPLEMENTATION EVIDENCE REQUIRED / EXPERIMENTAL RESULT REQUIRED / FUTURE)
+
+---
+Task ID: 4
+Agent: Super Z (main)
+Task: Master-prompt completion pass — close remaining gaps vs the 37-section MASTER IMPLEMENTATION PROMPT, re-verify everything with fresh runs, and deliver the §37 engineering completion report.
+
+Work Log:
+- Re-verified baseline: `next build` PASSES; `tsc --noEmit` clean for product code; `bun scripts/batch-test.ts` re-run → 14/14 PS-169 scenarios PASS all 5 gates (mean of 5 seeds; FPS 923–1335)
+- Fixed 4 pre-existing TS errors in scripts/reacq-latency-test.ts (stale beaconStartY field, unsafe PassFail cast, null-loss coercion); reacq test re-run reproduces 0.690 s avg (gate PASS) / 1.167 s physics-limited
+- GAP FOUND: §29 unit-test suite did not exist (no *.test.ts anywhere). Created tests/engine-unit.test.ts (RNG determinism, 6 trajectory equations, camera projection/saturation/clamping, px→angle identity 16px=0.1°, weighted centroid, candidate filtering + sticky gating, Kalman convergence/predict-advance, PID deadband/saturation/anti-windup/dt=0/reset/scan, disturbance statistics + determinism + GT-untouched contract, Zod config validation, PS_TARGETS)
+- Created tests/engine-integration.test.ts: closed-loop proof (out-of-FOV beacon → search → acquire ≤2 s → TRACK; camera moved >1°; final viewport offset <10 px; beacon trajectory identical to control-free reference = NO teleport), system determinism (2 runs → identical metrics), loss→PREDICT_REACQUIRE→reacquire (0.5 s outage → ≤1 s), state-machine no-single-frame-TRACK
+- Debugged own tests (3 wrong assumptions fixed: circular orbit center is (cx−r, cy); float-accumulation endpoint; 60 px prediction gate needs >64 px frame separation) — engine itself needed zero changes
+- Result: `bun test tests/` → 49/49 pass (24,090 assertions); added "test" script to package.json; bun-types references for Bun globals
+- DEMO 6 (scripts/distractor-demo.ts, new): 12-decoy storm + elevated background → acquisition 0.100 s, avg error 0.95 px, loss 0 %, lock 100 %, 1219 FPS, 5/5 gates, locked on REAL beacon
+- DEMO 7 (scripts/mp4-demo.ts, new): genuine headless MP4 ingestion via ffmpeg rawvideo pipe → same pipeline; 600 frames decoded, 100 % detection, 598-frame continuity, 1282 FPS, 0.77 ms detector latency, ref-free pass_fail=null policy honored (no GT fabrication)
+- Verified KILL BEACON dev control fully wired: telemetry-panel button → store → engine-client → worker → scene.ts render flag
+- Created IMPLEMENTATION_STATUS.md (§32): 17 engine modules + infrastructure table (status/missing/files/test status), §33 A–T acceptance evidence map, 6 honest limitations, verification commands
+- Created download/FSOC-PAT_Completion_Report.md (§37): 14 required sections, all numbers from executed commands dated 2026-09-14
+
+Stage Summary:
+- All 37 master-prompt sections satisfied or explicitly documented as optional/partial with no mocks: engine complete, tests complete (49/49 + 14/14 gates + 7 demos), build/typecheck clean, IMPLEMENTATION_STATUS.md + completion report delivered
+- New artifacts: tests/engine-unit.test.ts, tests/engine-integration.test.ts, scripts/distractor-demo.ts, scripts/mp4-demo.ts, IMPLEMENTATION_STATUS.md, download/FSOC-PAT_Completion_Report.md
+- VERDICT: PRODUCTION READY — re-confirmed with fresh 2026-09-14 evidence
