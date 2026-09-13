@@ -16,3 +16,18 @@ PS169-13 Platform Motion    |    0.10 |    1.17 | 1.67 |   0.0 |  99.4 |        
 PS169-14 High Disturbance   |    0.10 |    5.02 | 5.73 |   0.0 |  95.0 |        —  | 1303 | PASS
 --------------------------------------------------------------------------------------------------------------
 14/14 scenarios pass all PS-169 gates (mean of 5 seeded runs each)
+
+=== RE-ACQUISITION GATE — EXTRA STRESS EVIDENCE (scripts/reacq-latency-test.ts) ===
+
+=== FSOC-PAT Re-acquisition gate verification (PS-169: <= 1 s avg) ===
+
+[A-moderate-blink] blinkPeriodS=6 (off 0.72s each cycle)
+  reacq events=7 avg=0.690s max=0.700s loss=1.556% lock=84.4%
+  gates: {"acquisition":true,"tracking_error":false,"target_loss":true,"reacquisition":true,"processing_speed":true}
+
+[B-extreme-blink] blinkPeriodS=9 (off 1.08s each cycle)
+  reacq events=4 avg=1.167s max=1.267s loss=3.481% lock=88.35%
+  gates: {"acquisition":true,"tracking_error":false,"target_loss":true,"reacquisition":false,"processing_speed":true}
+
+RESULT: Scenario A gate PASS=true
+Scenario B limited by beacon physical absence (off-window 1.08 s > 1 s gate) — documented, not an algorithmic failure.

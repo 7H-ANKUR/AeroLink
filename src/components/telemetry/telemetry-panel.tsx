@@ -181,7 +181,17 @@ export function TelemetryPanel() {
       <div className="panel px-3 py-3">
         <div className="flex items-center justify-between mb-2">
           <div className="panel-title">PS-169 Benchmark</div>
-          <GateBadge na={m === null} pass={null} />
+          {running || phase === 'paused' ? (
+            <span className="inline-flex items-center gap-1 text-[9px] tracking-wider text-fsoc-warning border border-fsoc-warning/40 rounded px-1.5 py-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-fsoc-warning animate-pulse" /> LIVE
+            </span>
+          ) : m !== null ? (
+            <span className="inline-flex items-center gap-1 text-[9px] tracking-wider text-fsoc-success/80 border border-fsoc-success/30 rounded px-1.5 py-0.5">
+              <Check className="w-2.5 h-2.5" /> FINAL
+            </span>
+          ) : (
+            <GateBadge na pass={null} />
+          )}
         </div>
         <div className="space-y-2">
           <BenchmarkRow
@@ -217,6 +227,9 @@ export function TelemetryPanel() {
         </div>
         <p className="text-[9px] text-fsoc-text3 leading-relaxed mt-2.5">
           Official PS-169 targets — distinct from internal engineering thresholds shown above.
+          {running || phase === 'paused'
+            ? ' Values are live; official pass/fail is finalized at run end (docs/08 §5).'
+            : ''}
         </p>
       </div>
 
