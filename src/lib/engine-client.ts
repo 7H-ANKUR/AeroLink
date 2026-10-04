@@ -257,8 +257,9 @@ class EngineClient {
     return this.validationOk;
   }
 
-  /** Initialize + start a run. Config is locked while running (docs/03 §3). */
-  start(config: ScenarioConfig): void {
+  /** Initialize + start a run. Config is locked while running (docs/03 §3).
+   *  `demo` arms the §22 judge-demonstration injection timeline. */
+  start(config: ScenarioConfig, demo = false): void {
     if (!this.validateAndSet(config)) {
       this.pushLog('ERROR', 'Cannot start: configuration invalid', 'Fix the highlighted fields');
       return;
@@ -274,6 +275,7 @@ class EngineClient {
     this.latest = null;
     const w = this.ensureWorker();
     w.postMessage({ type: 'init', config: this.config });
+    w.postMessage({ type: 'setDemoScript', enabled: demo });
     w.postMessage({ type: 'start' });
     this.phase = 'initializing';
     this.notify();

@@ -1,0 +1,409 @@
+{
+  "generated_at": "2026-09-29T12:05:53.768Z",
+  "software_version": "1.0.0",
+  "ps_targets": {
+    "acquisition_s": 2,
+    "tracking_error_px": 10,
+    "target_loss_percent": 5,
+    "reacquisition_s": 1,
+    "processing_fps": 20
+  },
+  "seeds_per_scenario": 5,
+  "seconds_per_run": 30,
+  "scenarios_passing": 14,
+  "scenarios_total": 14,
+  "scenarios": [
+    {
+      "id": "PS169-01",
+      "name": "PS169-01 Straight / Clear",
+      "seeds": [
+        11,
+        148,
+        285,
+        422,
+        559
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.2738,
+        "rmse_px": 1.8328,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.556,
+        "reacquisition_s": null,
+        "algorithm_fps": 3435.404
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-02",
+      "name": "PS169-02 Circular / Clear",
+      "seeds": [
+        22,
+        159,
+        296,
+        433,
+        570
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.0834,
+        "rmse_px": 1.5848,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.444,
+        "reacquisition_s": null,
+        "algorithm_fps": 4022.822
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-03",
+      "name": "PS169-03 Figure-8 / Clear",
+      "seeds": [
+        42,
+        179,
+        316,
+        453,
+        590
+      ],
+      "mean": {
+        "acquisition_s": 0.6002,
+        "avg_error_px": 6.042199999999999,
+        "rmse_px": 6.758800000000001,
+        "target_loss_pct": 1.6667999999999998,
+        "lock_retention_pct": 96.362,
+        "reacquisition_s": null,
+        "algorithm_fps": 3988.882
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-04",
+      "name": "PS169-04 Random / Clear",
+      "seeds": [
+        7,
+        144,
+        281,
+        418,
+        555
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.1178,
+        "rmse_px": 1.6827999999999999,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.376,
+        "reacquisition_s": null,
+        "algorithm_fps": 3984.4080000000004
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-05",
+      "name": "PS169-05 Gaussian Noise",
+      "seeds": [
+        15,
+        152,
+        289,
+        426,
+        563
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.671,
+        "rmse_px": 2.367,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.422,
+        "reacquisition_s": null,
+        "algorithm_fps": 2941.2000000000003
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-06",
+      "name": "PS169-06 Salt & Pepper",
+      "seeds": [
+        16,
+        153,
+        290,
+        427,
+        564
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.8244,
+        "rmse_px": 2.6402,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.064,
+        "reacquisition_s": null,
+        "algorithm_fps": 719.972
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-07",
+      "name": "PS169-07 Poisson",
+      "seeds": [
+        17,
+        154,
+        291,
+        428,
+        565
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.332,
+        "rmse_px": 2.0589999999999997,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.064,
+        "reacquisition_s": null,
+        "algorithm_fps": 3069.284
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-08",
+      "name": "PS169-08 Camera Jitter",
+      "seeds": [
+        18,
+        155,
+        292,
+        429,
+        566
+      ],
+      "mean": {
+        "acquisition_s": 1.5468,
+        "avg_error_px": 7.1422,
+        "rmse_px": 8.1918,
+        "target_loss_pct": 4.8224,
+        "lock_retention_pct": 80.754,
+        "reacquisition_s": null,
+        "algorithm_fps": 3968.2940000000003
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-09",
+      "name": "PS169-09 Haze",
+      "seeds": [
+        19,
+        156,
+        293,
+        430,
+        567
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.798,
+        "rmse_px": 2.4428,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.33200000000001,
+        "reacquisition_s": null,
+        "algorithm_fps": 3940.3660000000004
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-10",
+      "name": "PS169-10 Fog",
+      "seeds": [
+        20,
+        157,
+        294,
+        431,
+        568
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.1324,
+        "rmse_px": 1.5695999999999999,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.6,
+        "reacquisition_s": null,
+        "algorithm_fps": 3982.6940000000004
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-11",
+      "name": "PS169-11 Rain",
+      "seeds": [
+        21,
+        158,
+        295,
+        432,
+        569
+      ],
+      "mean": {
+        "acquisition_s": 1.3266,
+        "avg_error_px": 6.123600000000001,
+        "rmse_px": 6.867,
+        "target_loss_pct": 4.0888,
+        "lock_retention_pct": 95.66999999999999,
+        "reacquisition_s": null,
+        "algorithm_fps": 3766.1440000000002
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-12",
+      "name": "PS169-12 Low Light",
+      "seeds": [
+        23,
+        160,
+        297,
+        434,
+        571
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.6198000000000001,
+        "rmse_px": 2.2328,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.688,
+        "reacquisition_s": null,
+        "algorithm_fps": 3842.596
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-13",
+      "name": "PS169-13 Platform Motion",
+      "seeds": [
+        24,
+        161,
+        298,
+        435,
+        572
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 1.2146,
+        "rmse_px": 1.8188,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 99.266,
+        "reacquisition_s": null,
+        "algorithm_fps": 3953.2439999999997
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    },
+    {
+      "id": "PS169-14",
+      "name": "PS169-14 High Disturbance",
+      "seeds": [
+        99,
+        236,
+        373,
+        510,
+        647
+      ],
+      "mean": {
+        "acquisition_s": 0.1,
+        "avg_error_px": 4.851,
+        "rmse_px": 5.5438,
+        "target_loss_pct": 0,
+        "lock_retention_pct": 96.97,
+        "reacquisition_s": null,
+        "algorithm_fps": 3488.656
+      },
+      "gates": {
+        "acquisition": true,
+        "tracking_error": true,
+        "target_loss": true,
+        "reacquisition": true,
+        "processing_speed": true
+      },
+      "all_pass": true
+    }
+  ]
+}

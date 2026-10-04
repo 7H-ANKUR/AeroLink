@@ -19,11 +19,17 @@ export const scenarioConfigSchema = z
     durationS: z.number().min(5).max(600),
 
     scene: z.object({
-      // PS-OFFICIAL: minimum screen size 2000 x 2000 px
-      width: z.number().int().min(1000).max(4096),
-      height: z.number().int().min(1000).max(4096),
+      // PS-OFFICIAL row 1: minimum screen size 2000 x 2000 px
+      width: z.number().int().min(2000).max(4096),
+      height: z.number().int().min(2000).max(4096),
       distractorCount: z.number().int().min(0).max(12),
       backgroundLevel: z.number().int().min(0).max(80),
+      // IMPL: decoy brightness range (fraction of the 200-level stamp). The
+      // default is below the 90 detection threshold, so decoys are texture
+      // rather than competing candidates. The hard-negative scenarios and the
+      // dataset generator raise it to produce genuine false bright objects.
+      distractorIntensityMin: z.number().min(0.1).max(1).default(0.36),
+      distractorIntensityMax: z.number().min(0.1).max(1).default(0.44),
     }),
 
     camera: z.object({
@@ -33,18 +39,34 @@ export const scenarioConfigSchema = z
       // PS-OFFICIAL: user-defined FOV, default 4 x 3 deg
       fovXDeg: z.number().min(0.5).max(30),
       fovYDeg: z.number().min(0.5).max(30),
-      // PS-OFFICIAL: >= 30 Hz camera update rate
-      updateHz: z.number().min(10).max(120),
-      // PS-OFFICIAL: default max pan/tilt speed 5 deg/s
-      maxPanSpeedDegS: z.number().min(0.5).max(30),
-      maxTiltSpeedDegS: z.number().min(0.5).max(30),
+      // PS-OFFICIAL row 5: >= 30 Hz virtual-camera update rate (the default).
+      // Floor is row 15's >= 20 Hz control-update interval rather than 30 so
+      // that an externally supplied benchmark video at 24/25 fps can still be
+      // ingested in Mode B (docs/08 §4) — the virtual camera itself stays 30 Hz.
+      updateHz: z.number().min(20).max(120),
+      // PS-OFFICIAL rows 13-14: 5-10 deg/s user-defined, default 5 deg/s
+      maxPanSpeedDegS: z.number().min(5).max(10),
+      maxTiltSpeedDegS: z.number().min(5).max(10),
+      // IMPL: virtual mount angular acceleration. Bounds how fast the achieved
+      // rate can approach the commanded rate, so the mount lags its command
+      // like real gimbal hardware (master prompt §13). 40 °/s² reaches the
+      // 5 °/s PS maximum in ~0.13 s.
+      mountAccelDegS2: z.number().min(5).max(500).default(40),
+      // IMPL (AI plan Phase 3): sensor exposure time. Anything that moves
+      // across the focal plane during the exposure is smeared along its path:
+      // the beacon by its own motion relative to the boresight, static
+      // objects by the mount's slew. 0 = instantaneous exposure (no smear),
+      // which is what every published benchmark was measured with.
+      exposureMs: z.number().min(0).max(33).default(0),
       monochrome: z.boolean(),
     }),
 
     beacon: z.object({
       count: z.number().int().min(1).max(5),
-      // PS-OFFICIAL: default square, default 10 x 10 px
-      sizePx: z.number().int().min(2).max(60),
+      // PS-OFFICIAL row 9: user-defined shape, default square
+      shape: z.enum(['square', 'circle']).default('square'),
+      // PS-OFFICIAL row 10: 5-20 x 5-20 px user-defined, default 10 x 10
+      sizePx: z.number().int().min(5).max(20),
       intensity: z.number().min(0.2).max(1),
       // PS-OFFICIAL: 4 required motions + optional extras
       motion: z.enum(['straight', 'circular', 'figure8', 'random', 'spiral', 'sinusoidal']),
@@ -52,11 +74,20 @@ export const scenarioConfigSchema = z
       startX: z.number().nullable(), // null = random within scene (IMPL)
       startY: z.number().nullable(),
       blinkPeriodS: z.number().min(0).max(30), // 0 = never blinks (IMPL; enables loss demos)
+      // IMPL (AI plan Phase 3): optical point-spread function, Gaussian sigma
+      // in px — defocus / diffraction / turbulence spreading every spot in the
+      // scene (beacon and decoys alike). 0 = ideal optics (the published
+      // benchmark setting).
+      blurSigmaPx: z.number().min(0).max(4).default(0),
     }),
 
     tracking: z
       .object({
-        detector: z.enum(['cv_classical']),
+        // AI plan Phase 11: the perception path is switchable at run time so
+        // classical / learned / hybrid can be compared on identical seeded
+        // frames. The learned kinds require a weights file; createDetector
+        // throws rather than silently falling back (src/engine/detectors.ts).
+        detector: z.enum(['cv_classical', 'ai', 'fusion', 'ai_fullframe']),
         tracker: z.enum(['kalman_cv']),
         controller: z.enum(['pid_angle_space']),
         // IMPL defaults; all user-tunable
@@ -65,8 +96,22 @@ export const scenarioConfigSchema = z
         candidateDisconfirmFrames: z.number().int().min(1).max(60),
         lostTimeoutFrames: z.number().int().min(1).max(120),
         searchPattern: z.enum(['raster', 'spiral']),
+        // IMPL §11: sweep speed as a fraction of the mount's max slew rate.
+        // Faster covers the scene sooner but leaves less dwell time for the
+        // detector to confirm a candidate; tuned by measurement below.
+        searchRateFactor: z.number().min(0.05).max(1).default(0.9),
         countPredictionAsLocked: z.boolean(),
         threshold: z.number().int().min(20).max(250),
+        // IMPL: candidates scoring below this composite confidence are
+        // rejected outright rather than handed to the tracker. Measured
+        // separation is wide — real beacon detections score ~1.00 while
+        // rain-streak / noise candidates average ~0.30 (master prompt §8).
+        minDetectionConfidence: z.number().min(0).max(0.95).default(0.5),
+        // Diagnostic causality switches (master prompt §40, §41). Both default
+        // ON. Turning one OFF is expected to visibly break the chain — that is
+        // the point: it demonstrates the component is doing real work.
+        controllerEnabled: z.boolean().default(true),
+        detectorEnabled: z.boolean().default(true),
         minAreaPx: z.number().int().min(1).max(500),
         maxAreaPx: z.number().int().min(10).max(20000),
         kalmanQ: z.number().min(0.0001).max(50),
@@ -83,7 +128,7 @@ export const scenarioConfigSchema = z
 
     noise: z.object({
       saltPepperPercent: z.number().min(0).max(40), // PS-OFFICIAL suggests 10% option
-      gaussianSigma: z.number().min(0).max(60), // PS-OFFICIAL max std-dev 20 (gray levels)
+      gaussianSigma: z.number().min(0).max(20), // PS-OFFICIAL row 21.2: max std-dev 20 (gray levels)
       poissonEnabled: z.boolean(),
     }),
 
@@ -149,6 +194,8 @@ export const DEFAULT_CONFIG: ScenarioConfig = {
     height: 2000,
     distractorCount: 2,
     backgroundLevel: 18,
+    distractorIntensityMin: 0.36,
+    distractorIntensityMax: 0.44,
   },
   camera: {
     resolutionWidth: 640, // PS-OFFICIAL default resolution
@@ -158,10 +205,13 @@ export const DEFAULT_CONFIG: ScenarioConfig = {
     updateHz: 30, // PS-OFFICIAL minimum update rate
     maxPanSpeedDegS: 5.0, // PS-OFFICIAL default max speed
     maxTiltSpeedDegS: 5.0,
+    mountAccelDegS2: 40, // IMPL: bounded mount dynamics
+    exposureMs: 0, // IMPL: instantaneous exposure (no motion blur)
     monochrome: true, // PS-OFFICIAL monochrome focal-plane array
   },
   beacon: {
     count: 1,
+    shape: 'square', // PS-OFFICIAL default shape
     sizePx: 10, // PS-OFFICIAL default 10x10 px
     intensity: 1.0,
     motion: 'figure8',
@@ -169,6 +219,7 @@ export const DEFAULT_CONFIG: ScenarioConfig = {
     startX: null,
     startY: null,
     blinkPeriodS: 0,
+    blurSigmaPx: 0, // IMPL: ideal optics (no PSF blur)
   },
   tracking: {
     detector: 'cv_classical',
@@ -179,8 +230,12 @@ export const DEFAULT_CONFIG: ScenarioConfig = {
     candidateDisconfirmFrames: 8,
     lostTimeoutFrames: 30,
     searchPattern: 'raster',
+    searchRateFactor: 0.9,
     countPredictionAsLocked: true,
     threshold: 90,
+    minDetectionConfidence: 0.5,
+    controllerEnabled: true,
+    detectorEnabled: true,
     minAreaPx: 4,
     maxAreaPx: 1200,
     kalmanQ: 0.6,

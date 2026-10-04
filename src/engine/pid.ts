@@ -124,34 +124,139 @@ export class PIDAngleController {
  * the beacon) and grows to full-scene coverage. The controller then PID-drives
  * the camera onto this point, so search speed respects pan/tilt limits.
  */
+/**
+ * Coarse-acquisition search pattern (master prompt §11).
+ *
+ * An EXPANDING serpentine raster, centred on wherever the receiver was pointing
+ * when the lock dropped. The swept box starts about one field of view wide and
+ * grows until it covers the scene.
+ *
+ * That shape is not decorative — it is what the two failure modes demand, and
+ * they demand opposite things:
+ *
+ *  - A SHORT outage (a blink, a brief occultation) ends with the beacon back
+ *    almost exactly where it vanished. A sweep that immediately marches across
+ *    the scene abandons it: measured target loss 1.6 % -> 44.6 % on a blinking
+ *    beacon when a full-scene raster was used from the first frame.
+ *
+ *  - A LONG blackout ends with the beacon somewhere else entirely, so the sweep
+ *    must eventually cover everything. The previous expanding Lissajous stepped
+ *    vertically about nine times slower than horizontally, so it never really
+ *    covered the field: a 7 s blackout took 24 s to recover.
+ *
+ * Starting local and expanding satisfies both, and the motion is bounded by the
+ * mount's own slew rate so the camera actually follows the scan point instead
+ * of chasing one it can never reach.
+ */
 export class ScanPattern {
-  private phase = 0;
+  private travelled = 0;
+  private elapsedS = 0;
+  private rowPitchPx: number;
+  private pointSpeedPxS: number;
+  private growthPxS: number;
+  private startHalfW: number;
+  private startHalfH: number;
+  private originX: number;
+  private originY: number;
+
   constructor(
     private pattern: 'raster' | 'spiral',
     private sceneWidth: number,
     private sceneHeight: number,
-  ) {}
+    opts?: {
+      viewportWidthPx?: number;
+      viewportHeightPx?: number;
+      slewRateDegS?: number;
+      pxPerDeg?: number;
+      rateFactor?: number;
+      /** Seconds for the swept box to grow from one FOV to the whole scene. */
+      expandS?: number;
+    },
+  ) {
+    const vw = opts?.viewportWidthPx ?? 640;
+    const vh = opts?.viewportHeightPx ?? 480;
+    const rate = (opts?.slewRateDegS ?? 5) * (opts?.rateFactor ?? 1);
+    const ppd = opts?.pxPerDeg ?? 160;
+    // 70 % of viewport height leaves overlap between rows, so a target sitting
+    // on a row boundary is not stepped over.
+    this.rowPitchPx = Math.max(40, vh * 0.7);
+    this.pointSpeedPxS = Math.max(1, rate * ppd);
+    // Start tight. A wider opening box sweeps more empty scene before reaching
+    // a target that is only just out of view: at 0.6 x viewport the standing
+    // integration case (beacon 343 px off-boresight) took 10.4 s to acquire
+    // against a 2 s gate; at 0.35 it is found almost immediately and the box
+    // still expands to cover the scene for the long-blackout case.
+    this.startHalfW = vw * 0.35;
+    this.startHalfH = vh * 0.35;
+    const expandS = opts?.expandS ?? 12;
+    this.growthPxS = Math.max(1, (Math.max(sceneWidth, sceneHeight) / 2) / expandS);
+    this.originX = sceneWidth / 2;
+    this.originY = sceneHeight / 2;
+  }
 
-  /** Scan target in scene px for time dt. */
+  /** Start the sweep at a point — normally the boresight on entry to SEARCH. */
+  setOrigin(x: number, y: number): void {
+    this.originX = x;
+    this.originY = y;
+    this.travelled = 0;
+    this.elapsedS = 0;
+  }
+
+  /** Move the sweep centre without restarting the expansion. */
+  moveOrigin(x: number, y: number): void {
+    this.originX = x;
+    this.originY = y;
+  }
+
+  /** Back to a cold, scene-centred search. */
+  resetOrigin(): void {
+    this.setOrigin(this.sceneWidth / 2, this.sceneHeight / 2);
+  }
+
+  get origin(): { x: number; y: number } {
+    return { x: this.originX, y: this.originY };
+  }
+
+  /** Seconds until the swept box reaches the whole scene. */
+  get fullCoverageTimeS(): number {
+    return Math.max(this.sceneWidth, this.sceneHeight) / 2 / this.growthPxS;
+  }
+
+  /** Scan target in scene px after advancing dt seconds. */
   step(dtS: number, scale: number): { x: number; y: number } {
-    this.phase += dtS * 0.24 * scale;
-    const p = this.phase;
-    // expanding amplitude: ±25% coverage at start → full scene by ~4 s
-    const amp = Math.min(1, 0.25 + p * 0.62);
-    const ax = this.sceneWidth * 0.36 * amp;
-    const ay = this.sceneHeight * 0.36 * amp;
-    if (this.pattern === 'raster') {
-      // wide horizontal sweep with slow vertical stepping (raster coverage)
+    const k = Math.max(0.05, scale);
+    this.elapsedS += dtS;
+    this.travelled += dtS * this.pointSpeedPxS * k;
+
+    // box grows from one FOV to the full scene
+    const halfW = Math.min(this.sceneWidth / 2, this.startHalfW + this.elapsedS * this.growthPxS);
+    const halfH = Math.min(this.sceneHeight / 2, this.startHalfH + this.elapsedS * this.growthPxS);
+
+    const x0 = Math.max(0, this.originX - halfW);
+    const x1 = Math.min(this.sceneWidth, this.originX + halfW);
+    const y0 = Math.max(0, this.originY - halfH);
+    const y1 = Math.min(this.sceneHeight, this.originY + halfH);
+    const boxW = Math.max(1, x1 - x0);
+    const boxH = Math.max(1, y1 - y0);
+    const rows = Math.max(1, Math.ceil(boxH / this.rowPitchPx));
+
+    if (this.pattern === 'spiral') {
+      const ang = (this.travelled / Math.max(1, this.pointSpeedPxS)) * 2.2;
+      const rad = Math.min(halfW, halfH) * (0.35 + 0.65 * Math.abs(Math.sin(ang * 0.31)));
       return {
-        x: this.sceneWidth / 2 + ax * Math.sin(p * Math.PI),
-        y: this.sceneHeight / 2 + ay * Math.sin(p * Math.PI * 0.11),
+        x: clamp(this.originX + Math.cos(ang) * rad, 0, this.sceneWidth),
+        y: clamp(this.originY + Math.sin(ang) * rad, 0, this.sceneHeight),
       };
     }
-    // spiral-ish Lissajous
-    return {
-      x: this.sceneWidth / 2 + ax * Math.sin(p) * Math.cos(p * 0.21),
-      y: this.sceneHeight / 2 + ay * Math.sin(p * 1.31) * Math.cos(p * 0.13),
-    };
+
+    const total = boxW * rows;
+    const along = ((this.travelled % total) + total) % total;
+    const row = Math.min(rows - 1, Math.floor(along / boxW));
+    const inRow = along - row * boxW;
+    // serpentine: alternate rows run the other way so the path is continuous
+    const x = row % 2 === 0 ? x0 + inRow : x1 - inRow;
+    const y = y0 + (row + 0.5) * (boxH / rows);
+    return { x: clamp(x, 0, this.sceneWidth), y: clamp(y, 0, this.sceneHeight) };
   }
 }
 

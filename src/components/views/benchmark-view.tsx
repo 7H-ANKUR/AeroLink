@@ -214,7 +214,7 @@ export function BenchmarkView() {
               </label>
             ) : (
               <div className="panel overflow-hidden">
-                <div className="relative bg-[#05070a] aspect-video flex items-center justify-center">
+                <div className="relative bg-[var(--sensor-void)] aspect-video flex items-center justify-center">
                   <canvas ref={previewRef} width={640} height={480} className={`max-w-full max-h-full object-contain ${running ? '' : 'hidden'}`} style={{ imageRendering: 'pixelated' }} />
                   <video ref={videoRef} src={videoInfo.objectUrl} className={`absolute inset-0 w-full h-full object-contain ${running ? 'w-px h-px opacity-0' : ''}`} playsInline muted />
                 </div>
@@ -230,7 +230,7 @@ export function BenchmarkView() {
                       <Square className="w-3.5 h-3.5" /> Stop
                     </Button>
                   ) : (
-                    <Button size="sm" className="gap-1.5 h-8 bg-fsoc-cyan text-[#06272c] hover:bg-fsoc-cyan/85 font-semibold" onClick={startAnalysis}>
+                    <Button size="sm" className="gap-1.5 h-8 bg-fsoc-cyan text-white hover:bg-fsoc-cyan/85 font-semibold" onClick={startAnalysis}>
                       <Play className="w-3.5 h-3.5" /> Run Perception Pipeline
                     </Button>
                   )}

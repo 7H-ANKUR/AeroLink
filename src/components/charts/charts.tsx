@@ -31,14 +31,14 @@ function ChartPanel({ title, children, right }: { title: string; children: React
   );
 }
 
-const axisStyle = { fontSize: 9, fill: '#58636d', fontFamily: 'var(--font-tech)' };
+const axisStyle = { fontSize: 9, fill: 'var(--text-3)', fontFamily: 'var(--font-tech)' };
 const tooltipStyle = {
-  background: '#13181d',
-  border: '1px solid #313a43',
+  background: 'var(--bg-1)',
+  border: '1px solid var(--border-2)',
   borderRadius: 6,
   fontSize: 10,
   fontFamily: 'var(--font-tech)',
-  color: '#c3ccd4',
+  color: 'var(--text-1)',
 };
 
 export function ErrorChart() {
@@ -62,11 +62,11 @@ export function ErrorChart() {
     >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
-          <XAxis dataKey="t" tick={axisStyle} tickLine={false} axisLine={{ stroke: '#252c33' }} minTickGap={40} />
+          <XAxis dataKey="t" tick={axisStyle} tickLine={false} axisLine={{ stroke: 'var(--border-2)' }} minTickGap={40} />
           <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={34} />
           <Tooltip contentStyle={tooltipStyle} labelFormatter={(v) => `t = ${v}s`} />
-          <ReferenceLine y={10} stroke="#d8b56b" strokeDasharray="4 4" strokeOpacity={0.7} />
-          <Line type="monotone" dataKey="e" stroke="#72d9e8" strokeWidth={1.2} dot={false} isAnimationActive={false} />
+          <ReferenceLine y={10} stroke="var(--warning)" strokeDasharray="4 4" strokeOpacity={0.7} />
+          <Line type="monotone" dataKey="e" stroke="var(--accent-cyan)" strokeWidth={1.2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </ChartPanel>
@@ -94,13 +94,13 @@ export function ControlChart() {
     <ChartPanel title="Pan / Tilt Rate Command (°/s)">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
-          <XAxis dataKey="t" tick={axisStyle} tickLine={false} axisLine={{ stroke: '#252c33' }} minTickGap={40} />
+          <XAxis dataKey="t" tick={axisStyle} tickLine={false} axisLine={{ stroke: 'var(--border-2)' }} minTickGap={40} />
           <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={34} domain={[-lim, lim]} />
           <Tooltip contentStyle={tooltipStyle} labelFormatter={(v) => `t = ${v}s`} />
-          <ReferenceLine y={lim} stroke="#58636d" strokeDasharray="3 4" strokeOpacity={0.6} />
-          <ReferenceLine y={-lim} stroke="#58636d" strokeDasharray="3 4" strokeOpacity={0.6} />
-          <Line type="monotone" dataKey="pan" stroke="#72d9e8" strokeWidth={1} dot={false} isAnimationActive={false} />
-          <Line type="monotone" dataKey="tilt" stroke="#d7b36e" strokeWidth={1} dot={false} isAnimationActive={false} />
+          <ReferenceLine y={lim} stroke="var(--text-3)" strokeDasharray="3 4" strokeOpacity={0.6} />
+          <ReferenceLine y={-lim} stroke="var(--text-3)" strokeDasharray="3 4" strokeOpacity={0.6} />
+          <Line type="monotone" dataKey="pan" stroke="var(--accent-cyan)" strokeWidth={1} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="tilt" stroke="var(--success)" strokeWidth={1} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </ChartPanel>
@@ -142,8 +142,8 @@ export function TrajectoryChart() {
           <XAxis dataKey="gx" type="number" domain={[minX, maxX]} hide />
           <YAxis type="number" domain={[minY, maxY]} tick={axisStyle} tickLine={false} axisLine={false} width={34} />
           <Tooltip contentStyle={tooltipStyle} />
-          <Line type="monotone" dataKey="gx" stroke="#90a7ff" strokeWidth={1} dot={false} isAnimationActive={false} />
-          <Line type="monotone" dataKey="ex" stroke="#72d9e8" strokeWidth={1} dot={false} strokeOpacity={0.85} isAnimationActive={false} />
+          <Line type="monotone" dataKey="gx" stroke="var(--accent-blue)" strokeWidth={1} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="ex" stroke="var(--accent-cyan)" strokeWidth={1} dot={false} strokeOpacity={0.85} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </ChartPanel>
@@ -160,11 +160,11 @@ export function LockTimeline() {
   const span = Math.max(0.001, tEnd - t0);
 
   const colors: Record<string, string> = {
-    SEARCH: '#3a454f',
-    CANDIDATE: '#d8b56b',
-    ACQUIRE: '#8faee8',
-    TRACK: '#79c99b',
-    PREDICT_REACQUIRE: '#d7b36e',
+    SEARCH: 'var(--border-2)',
+    CANDIDATE: 'var(--warning)',
+    ACQUIRE: 'var(--accent-blue)',
+    TRACK: 'var(--success)',
+    PREDICT_REACQUIRE: 'var(--state-predict)',
   };
 
   return (
@@ -189,7 +189,7 @@ export function LockTimeline() {
             <div
               key={i}
               className="h-3 rounded-[1px] shrink-0"
-              style={{ width: `${width}%`, background: colors[b.state] ?? '#3a454f', opacity: 0.85 }}
+              style={{ width: `${width}%`, background: colors[b.state] ?? 'var(--border-2)', opacity: 0.85 }}
               title={`${b.state} @ t=${b.startT.toFixed(1)}s`}
             />
           );

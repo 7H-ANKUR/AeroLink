@@ -1,0 +1,3744 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>FSOC-PAT Technical Report</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+body { font-family: "Segoe UI", Calibri, Arial, sans-serif; font-size: 10pt; line-height: 1.45; color: #1d1d1f; }
+h1 { font-size: 20pt; margin: 0 0 6pt; line-height: 1.2; }
+h2 { font-size: 14pt; border-bottom: 1.5px solid #2a6f97; padding-bottom: 3pt; margin-top: 18pt; color: #12324a; break-after: avoid; }
+h3 { font-size: 11.5pt; margin-top: 12pt; color: #12324a; break-after: avoid; }
+p, li { text-align: justify; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 8.4pt; break-inside: auto; }
+th, td { border: 0.6pt solid #b9c3cc; padding: 3pt 4pt; vertical-align: top; text-align: left; }
+th { background: #e8eff5; }
+tr { break-inside: avoid; }
+code { font-family: Consolas, "Courier New", monospace; font-size: 8.4pt; background: #f2f4f6; padding: 0 2px; }
+pre { background: #f2f4f6; padding: 6pt; font-size: 7.6pt; white-space: pre-wrap; word-break: break-word; border-left: 3px solid #2a6f97; }
+pre code { background: none; }
+code.hash { font-size: 6.6pt; word-break: break-all; }
+img { max-width: 100%; display: block; margin: 6pt auto 2pt; break-inside: avoid; }
+.caption { font-size: 8.4pt; color: #444; text-align: center; margin: 0 0 10pt; }
+.mermaid { text-align: center; margin: 8pt 0; break-inside: avoid; }
+.mermaid p, .mermaid span, .mermaid div { text-align: center !important; }
+.titlepage { min-height: 245mm; display: flex; flex-direction: column; justify-content: center; break-after: page; }
+.titlepage h1 { font-size: 24pt; color: #12324a; border: none; }
+.subtitle { font-size: 14pt; color: #2a6f97; margin: 4pt 0 24pt; }
+.titlepage table { font-size: 10pt; }
+hr { border: none; border-top: 0.6pt solid #ccc; margin: 12pt 0; }
+.katex-display { margin: 6pt 0; }
+</style></head><body>
+<div class="titlepage"><h1>AI-Assisted Virtual Camera Tracking for Coarse Pointing, Acquisition and Tracking in Free Space Optical Communication</h1>
+<p class="subtitle">Software-Based Simulation and Validation Platform for FSOC Coarse Alignment</p><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Event</td>
+<td>Smart India Hackathon (SIH) 2026</td>
+</tr>
+<tr>
+<td>Problem Statement</td>
+<td>PS-169 — <em>Development of an AI-Based Virtual Camera Tracking System for Coarse Alignment of Mobile Free Space Optical Communication (FSOC) Terminals</em></td>
+</tr>
+<tr>
+<td>Organisation</td>
+<td>Department of Space / Indian Space Research Organisation (ISRO)</td>
+</tr>
+<tr>
+<td>Category</td>
+<td>Software</td>
+</tr>
+<tr>
+<td>Theme</td>
+<td>Smart Automation (PS lists: Smart Automation, Space Technology)</td>
+</tr>
+<tr>
+<td>System name</td>
+<td>FSOC-PAT — Virtual Coarse Alignment Laboratory, software version 1.0.0</td>
+</tr>
+<tr>
+<td>Report basis</td>
+<td>Audit of the repository as built, 2026-10-04</td>
+</tr>
+</tbody></table>
+</div><h2>How to read this report</h2>
+<p>Every statement is labelled by its evidential status where it matters:</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>IMPLEMENTED</strong></td>
+<td>Present in the source code and executed; the file is named.</td>
+</tr>
+<tr>
+<td><strong>MEASURED</strong></td>
+<td>A number produced by running a named script on the machine described in §26; the output file is named.</td>
+</tr>
+<tr>
+<td><strong>DESIGNED</strong></td>
+<td>A design choice or rationale, not itself a measurement.</td>
+</tr>
+<tr>
+<td><strong>NOT IMPLEMENTED / NOT MEASURED</strong></td>
+<td>Absent from the current build; stated explicitly rather than omitted.</td>
+</tr>
+<tr>
+<td><strong>FUTURE</strong></td>
+<td>Proposed work. Nothing in this category exists.</td>
+</tr>
+</tbody></table>
+<p>All benchmark tables are generated automatically from the benchmark output files when this document is
+built (<code>scripts/build-report.ts</code>); no result in a table was typed by hand.</p>
+<p>The system is <strong>software only</strong>. There is no laser, telescope, gimbal, photodetector, UAV or satellite in
+this project, and nothing has been validated against optical hardware.</p>
+<hr>
+<h2>1. Executive Summary</h2>
+<p><strong>Free Space Optical Communication (FSOC)</strong> transmits data on a narrow beam of light instead of radio. A
+narrow beam gives very high data rates and a licence-free spectrum, but it creates a pointing problem: if
+the beam is a few microradians wide, a tiny angular error means the light simply misses the receiver.
+Mobile FSOC terminals therefore need <strong>Pointing, Acquisition and Tracking (PAT)</strong>: first <em>find</em> the remote
+terminal, then <em>keep</em> the beam on it while both platforms move. PAT is done in two stages. <strong>Coarse
+alignment</strong> uses a camera with a wide field of view (FOV) to find the remote terminal&#39;s <strong>beacon</strong> — a
+visible optical reference target used by the camera to determine the direction of the remote terminal —
+and to keep it inside the FOV. <strong>Fine alignment</strong> then takes over with fast steering optics. Fine
+alignment cannot start until coarse alignment has the beacon.</p>
+<p>Developing coarse-alignment algorithms on real hardware needs cameras, pan-tilt mechanisms and optical
+benches. PS-169 asks for a software substitute: a virtual scene, a virtual camera that can be pointed, a
+moving beacon, realistic disturbances, and an automatic tracking loop whose performance is measured.</p>
+<p><strong>What was built (IMPLEMENTED).</strong> FSOC-PAT is a browser application (Next.js/TypeScript) whose engine runs
+in a Web Worker at 30 Hz. Each frame: a 2000 × 2000 px scene containing a moving beacon and optional
+decoys is rendered; a 640 × 480 px monochrome sensor window (4° × 3° FOV) is cropped at the current
+pan/tilt pose; noise, atmosphere, blur, jitter and platform motion are applied to that image only; a
+perception stage finds the beacon; a Kalman filter tracks it; the pixel error becomes an angular
+line-of-sight (LOS) error; a PID controller commands pan/tilt rates; a rate- and acceleration-limited
+virtual mount moves the camera; and the next frame is seen from the new pose. Ground truth is used to
+render the scene and to score it, never to make a decision.</p>
+<p><strong>How AI and classical computer vision are combined (IMPLEMENTED).</strong> Three perception configurations share
+one interface: classical CV alone; a learned branch alone; and a hybrid. In the hybrid, a classical
+threshold detector and an independent learned branch (a local-contrast proposer plus a 2,989-parameter
+convolutional network, <em>TinyBeaconNet</em>) both propose candidates from the same frame; every candidate is
+followed over time in world coordinates and judged by a second learned model, the <em>track verifier</em>; a
+decision engine combines these with the Kalman prediction and lock hysteresis. In the shipped browser
+application both networks execute in <strong>ONNX Runtime Web 1.30.0 (WebAssembly)</strong> inside the simulation
+worker.</p>
+<p><strong>How performance is measured (MEASURED).</strong> A metrics engine computes the five PS-169 gates (acquisition
+time, tracking error, target loss, re-acquisition time, processing speed) plus RMSE, centroiding error and
+lock retention. A 14-scenario PS-169 benchmark passes all five gates in all 14 scenarios with the
+classical detector (§26). A controlled comparison of classical, AI-only and hybrid perception over 13
+conditions × 6 seeds (§27) shows the hybrid holding the true beacon ~97 % of the time in bright-decoy
+conditions where classical CV holds it 0 %, equal performance in benign conditions, and specific
+weaknesses that are reported in full.</p>
+<p><strong>Main contribution.</strong> A closed-loop, measurable coarse-alignment laboratory in which a learned perception
+stage runs on the real control loop in the browser, and in which the decision to trust a candidate is
+made from its behaviour over time — because on appearance alone, PS-169&#39;s beacon and a bright decoy are
+indistinguishable (the measured evidence for this claim is in §28).</p>
+<hr>
+<h2>2. Problem Statement and Understanding</h2>
+<h3>2.1 An everyday picture</h3>
+<p>Imagine trying to keep a laser pointer on a coin carried by someone walking across a field, while you are
+standing on a moving boat, at night, in light rain. You first have to <em>find</em> the coin, then keep turning
+to follow it, ignoring street lamps that look like the coin, and if you lose it behind a tree you must
+guess where it went and find it again quickly. FSOC coarse alignment is that task, done by a camera on a
+motorised mount.</p>
+<h3>2.2 Technical terms</h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning in this system</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Transmitter / receiver</td>
+<td>The two FSOC terminals. Here the <em>receiver&#39;s</em> camera tracks the <em>transmitter&#39;s</em> beacon.</td>
+</tr>
+<tr>
+<td>Optical beacon</td>
+<td>The remote terminal&#39;s light source as seen by the camera: a bright spot, 5–20 px, square or circular.</td>
+</tr>
+<tr>
+<td>Camera (focal-plane array)</td>
+<td>A virtual monochrome sensor, 640 × 480 px, sampling a window of the scene.</td>
+</tr>
+<tr>
+<td>FOV</td>
+<td>Field of view: the angular extent the sensor sees, 4° × 3° by default.</td>
+</tr>
+<tr>
+<td>Line of sight (LOS)</td>
+<td>The direction from the receiver to the beacon.</td>
+</tr>
+<tr>
+<td>Pointing error</td>
+<td>The angle between the camera boresight (image centre) and the LOS.</td>
+</tr>
+<tr>
+<td>Coarse alignment</td>
+<td>Finding the beacon and keeping it in (and centred in) the FOV — <strong>what this project implements</strong>.</td>
+</tr>
+<tr>
+<td>Fine alignment</td>
+<td>Sub-pixel/µrad beam steering after coarse lock — <strong>not implemented</strong> (out of PS-169 scope).</td>
+</tr>
+<tr>
+<td>PAT</td>
+<td>Pointing, acquisition and tracking: the whole process.</td>
+</tr>
+</tbody></table>
+<h3>2.3 Why software</h3>
+<p>PS-169 states that real-hardware development needs &quot;expensive cameras, pan-tilt mechanisms, and optical
+components&quot;. A simulator additionally gives what hardware cannot: exact ground truth for scoring, perfect
+repeatability through seeded randomness, and the ability to inject any disturbance on demand.</p>
+<hr>
+<h2>3. Objectives</h2>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Objective</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Primary</td>
+<td>Configurable virtual environment (scene size, background, decoys)</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Virtual camera with configurable resolution, FOV, rate, slew limits</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Moving optical beacon, six motion models</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Automatic detection — classical CV</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Automatic detection — AI</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Hybrid decision (classical + AI + temporal)</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Continuous tracking with Kalman prediction</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Virtual pan/tilt control (PID + bounded mount)</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Acquisition, lock maintenance, re-acquisition</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Disturbance simulation (noise, atmosphere, jitter, platform motion)</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Primary</td>
+<td>Real-time visualisation and automatic performance logging</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Secondary</td>
+<td>Optical blur and exposure motion smear</td>
+<td>IMPLEMENTED</td>
+</tr>
+<tr>
+<td>Secondary</td>
+<td>MP4 video input (PS Benchmark-2)</td>
+<td>IMPLEMENTED — perception-only, classical detector only (§30, row 12)</td>
+</tr>
+<tr>
+<td>Secondary</td>
+<td>Multiple simultaneous beacons</td>
+<td>NOT IMPLEMENTED (config accepts 1–5; renderer/tracker use 1)</td>
+</tr>
+<tr>
+<td>Secondary</td>
+<td>User-defined arbitrary trajectories</td>
+<td>NOT IMPLEMENTED (six built-in models)</td>
+</tr>
+<tr>
+<td>Future</td>
+<td>Hardware-in-the-loop, real camera, fine alignment</td>
+<td>FUTURE (§40)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. System Requirements</h2>
+<p>Status column: ✔ = implemented and verified in code/tests; ◐ = partial; ✘ = not implemented.</p>
+<h3>4.1 Functional (F) and simulation (S)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement (PS-169 row)</th>
+<th>Implementation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>F1</td>
+<td>Screen ≥ 2000 × 2000 (1)</td>
+<td><code>scene.width/height</code> 2000–4096, default 2000 (<code>config.ts</code>)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F2</td>
+<td>Monochrome FPA (2)</td>
+<td>8-bit single-channel frames (<code>Uint8Array</code>)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F3</td>
+<td>Resolution 640 × 480 (3)</td>
+<td><code>camera.resolutionWidth/Height</code>, default 640 × 480</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F4</td>
+<td>FOV user-defined, default 4° × 3° (4)</td>
+<td><code>camera.fovXDeg/fovYDeg</code></td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F5</td>
+<td>Update ≥ 30 Hz (5)</td>
+<td><code>camera.updateHz</code> default 30 (20–120)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F6</td>
+<td>Initial camera at screen centre (6)</td>
+<td>pan = tilt = 0 at start (<code>createCamera</code>)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F7</td>
+<td>Target = beacon spot (7)</td>
+<td><code>stampSpot</code> / <code>stampSoftSpot</code> (<code>scene.ts</code>)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F8</td>
+<td>1 target mandatory, multiple optional (8)</td>
+<td>single beacon rendered and tracked</td>
+<td>◐</td>
+</tr>
+<tr>
+<td>F9</td>
+<td>Shape user-defined, default square (9)</td>
+<td><code>beacon.shape</code> square/circle</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F10</td>
+<td>Size 5–20 px, default 10 (10)</td>
+<td><code>beacon.sizePx</code> 5–20, default 10</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F11</td>
+<td>Initial location user-defined, default random (11)</td>
+<td><code>startX/startY</code> or random ±220 px of centre</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F12</td>
+<td>≥ 4 motions + optional (12)</td>
+<td>straight, circular, figure-8, random, spiral, sinusoidal</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F13</td>
+<td>Max pan/tilt 5–10 °/s, default 5 (13, 14)</td>
+<td><code>maxPanSpeedDegS/maxTiltSpeedDegS</code> 5–10, default 5</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>F14</td>
+<td>Update interval ≥ 20 Hz (15)</td>
+<td>control runs every frame (30 Hz)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>S1</td>
+<td>Salt &amp; pepper, Gaussian, Poisson (21)</td>
+<td><code>applyDisturbances</code> (<code>camera.ts</code>)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>S2</td>
+<td>Noise σ up to 20 (22)</td>
+<td><code>noise.gaussianSigma</code> 0–20</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>S3</td>
+<td>Camera jitter ±20 px/frame (23)</td>
+<td><code>jitter.maxPxPerFrame</code> 0–20, magnitude clamped</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>S4</td>
+<td>Clear, haze, fog, rain, low light (24)</td>
+<td><code>atmosphereParams</code></td>
+<td>✔</td>
+</tr>
+<tr>
+<td>S5</td>
+<td>Platform motion ±20 px/frame, linear + optional (25)</td>
+<td><code>PlatformMotion</code>: linear, circular, figure-8, spiral, random</td>
+<td>✔</td>
+</tr>
+</tbody></table>
+<h3>4.2 AI (A), tracking (T), control (C), performance (P), logging (L), non-functional (N)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Implementation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A1</td>
+<td>AI-assisted detection on the live loop</td>
+<td><code>AiBranchDetector</code>, <code>HybridFusionDetector</code> (<code>detector-ai.ts</code>)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>Trained model loaded from app assets</td>
+<td><code>public/models/*.onnx</code>, fetched by the worker</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>Browser inference runtime</td>
+<td>ONNX Runtime Web 1.30.0, WASM (<code>src/lib/ort-runtime.ts</code>)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>No AI claim without a model</td>
+<td>learned detectors refuse to construct without weights</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>T1</td>
+<td>Track the beacon continuously</td>
+<td>Kalman filter + state machine (<code>kalman.ts</code>, <code>tracker.ts</code>)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>T2</td>
+<td>Survive short detection loss</td>
+<td><code>PREDICT_REACQUIRE</code> state, Kalman coasting</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>T3</td>
+<td>Re-acquire after loss</td>
+<td>search scan + re-confirmation</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>C1</td>
+<td>Control and reposition the camera</td>
+<td><code>PIDAngleController</code> + <code>ReceiverMount</code></td>
+<td>✔</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>Respect pan/tilt speed limits</td>
+<td>saturation in controller and mount</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>Acquisition ≤ 2 s (16)</td>
+<td>measured §26</td>
+<td>✔ (14/14 scenarios)</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Tracking error ≤ 10 px (17)</td>
+<td>measured §26</td>
+<td>✔ (14/14)</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>Target loss &lt; 5 % (18)</td>
+<td>measured §26</td>
+<td>✔ (14/14)</td>
+</tr>
+<tr>
+<td>P4</td>
+<td>Re-acquisition ≤ 1 s (19)</td>
+<td>measured §26</td>
+<td>✔ where loss occurs; fails in the 7 s blackout demo (§29.2)</td>
+</tr>
+<tr>
+<td>P5</td>
+<td>Processing ≥ 20 FPS (20)</td>
+<td>measured §26, §28.4</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>Automatic performance report</td>
+<td><code>metrics.json</code>, <code>events.csv</code>, <code>summary.html</code> (<code>export.ts</code>)</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>Real-time statistics display</td>
+<td>telemetry, charts, Perception Chain panel</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>N1</td>
+<td>Determinism</td>
+<td>seeded mulberry32 RNG; identical reruns asserted in tests</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>N2</td>
+<td>Runs offline, no API keys</td>
+<td>all assets served from the app origin</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>N3</td>
+<td>Standalone executable</td>
+<td>Next.js standalone server (<code>bun run build &amp;&amp; bun run start</code>); not a single-file native executable</td>
+<td>◐</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. High-Level System Architecture</h2>
+<div class="mermaid">flowchart TD
+  S["Simulation<br/>scene.ts · trajectories.ts"] --> CAM["Virtual camera crop<br/>camera.ts cropFrame"]
+  CAM --> DIST["Disturbance chain<br/>noise · atmosphere · blur · jitter · platform"]
+  DIST --> F["Observed frame 640×480"]
+  F --> CV["Classical CV branch<br/>detector.ts"]
+  F --> AIB["AI branch<br/>proposer.ts + TinyBeaconNet (ORT Web)"]
+  CV --> M["Merge candidates"]
+  AIB --> M
+  M --> TB["Candidate track bank + clutter map<br/>candidate-tracks.ts"]
+  TB --> TV["Track verifier (ORT Web)<br/>track-verifier.ts"]
+  TV --> DE["Decision engine<br/>fusion.ts"]
+  DE --> K["Kalman tracker + state machine<br/>kalman.ts · tracker.ts"]
+  K --> LOS["LOS / angular error"]
+  LOS --> PID["PID controller<br/>pid.ts"]
+  PID --> MT["Virtual pan/tilt mount<br/>mount.ts"]
+  MT --> CAM
+  K -.prediction.-> DE
+  GT[("Ground truth")] -.scoring only.-> MET["Metrics engine<br/>metrics.ts"]
+  K --> MET
+</div>
+<p class="caption">Figure A. Runtime architecture. Solid arrows are the closed loop executed every frame by
+<code>SimulationRunner.step / stepAsync</code> (<code>simulation.ts</code>); ground truth reaches only the metrics
+engine.</p><table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Responsibility</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Simulation</td>
+<td>Beacon trajectory, scene raster, decoys, starfield</td>
+<td><code>scene.ts</code>, <code>trajectories.ts</code></td>
+</tr>
+<tr>
+<td>Virtual camera</td>
+<td>Pose (pan, tilt), sensor-window crop</td>
+<td><code>camera.ts</code></td>
+</tr>
+<tr>
+<td>Disturbance chain</td>
+<td>Corrupts the observed frame only</td>
+<td><code>camera.ts</code> <code>applyDisturbances</code>, <code>scene.ts</code> blur/smear</td>
+</tr>
+<tr>
+<td>Classical CV</td>
+<td>Threshold, connected components, centroid, confidence</td>
+<td><code>detector.ts</code> <code>ClassicalDetector</code></td>
+</tr>
+<tr>
+<td>AI branch</td>
+<td>Local-contrast proposals scored by a CNN</td>
+<td><code>proposer.ts</code>, <code>nn.ts</code>, <code>detector-ai.ts</code></td>
+</tr>
+<tr>
+<td>Track bank / verifier</td>
+<td>Multi-frame evidence per candidate; learned P(beacon)</td>
+<td><code>candidate-tracks.ts</code>, <code>track-verifier.ts</code></td>
+</tr>
+<tr>
+<td>Decision engine</td>
+<td>Weighted score, hard gates, hysteresis</td>
+<td><code>fusion.ts</code> <code>fuse()</code></td>
+</tr>
+<tr>
+<td>Kalman + state machine</td>
+<td>Estimate, predict, lifecycle</td>
+<td><code>kalman.ts</code>, <code>tracker.ts</code></td>
+</tr>
+<tr>
+<td>LOS + PID</td>
+<td>Pixel → angle → rate command</td>
+<td><code>pid.ts</code> <code>PIDAngleController.compute</code></td>
+</tr>
+<tr>
+<td>Mount</td>
+<td>Rate/acceleration/travel limits; sole writer of pose</td>
+<td><code>mount.ts</code> <code>ReceiverMount.step</code></td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>PS-169 gates and statistics</td>
+<td><code>metrics.ts</code> <code>MetricsEngine</code></td>
+</tr>
+<tr>
+<td>Orchestration</td>
+<td>One canonical frame loop for UI, benchmark, tests</td>
+<td><code>simulation.ts</code>, <code>pipeline.ts</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>6. Detailed Data Flow of One Frame</h2>
+<p>This is the order of operations in <code>SimulationRunner.step()</code> / <code>stepAsync()</code> and <code>Pipeline.step()</code> /
+<code>stepAsync()</code> (verified in source):</p>
+<ol>
+<li><strong>Trajectory.</strong> <code>trajectory.at(t)</code> gives the beacon&#39;s scene position and velocity (ground truth).</li>
+<li><strong>Blink.</strong> If <code>blinkPeriodS &gt; 0</code>, the beacon is hidden for the first 12 % of each period.</li>
+<li><strong>Exposure smear.</strong> If <code>exposureMs &gt; 0</code>, the beacon&#39;s motion relative to the sensor window and the
+window&#39;s own slew are converted into smear vectors.</li>
+<li><strong>Render.</strong> <code>renderScene</code> stamps decoys and the beacon onto the background (optical PSF blur if set).</li>
+<li><strong>Pose offsets.</strong> Platform motion offset and Gaussian jitter (clamped) are added to the boresight.</li>
+<li><strong>Crop.</strong> <code>cropFrame</code> copies the 640 × 480 sensor window from the scene.</li>
+<li><strong>Disturbances.</strong> Salt &amp; pepper → Gaussian → Poisson → atmosphere → rain streaks, on the frame only.</li>
+<li><strong>Packet.</strong> A <code>FramePacket</code> is built: frame, timestamp, mount pose; ground truth is attached for the
+metrics branch.</li>
+<li><strong>Context.</strong> The pipeline hands the detector the tracker&#39;s own state, Kalman prediction and the mount
+pose (<code>setContext</code>).</li>
+<li><strong>Classical CV.</strong> <code>ClassicalDetector.detectCandidates</code> returns up to 12 candidates.</li>
+<li><strong>AI branch.</strong> <code>LocalContrastProposer.propose</code> returns up to 6 spots; <code>mergeBranchCandidates</code> merges
+them (source <code>cv</code>, <code>ai</code> or <code>both</code>).</li>
+<li><strong>CNN.</strong> All merged candidates are cropped (<code>buildPatchBatch</code>) and scored in one ONNX Runtime call.</li>
+<li><strong>Track bank.</strong> <code>CandidateTrackBank.update</code> associates candidates into world-frame tracks and fits
+velocities; feature rows are scored in one call by the track verifier; the clutter map is updated.</li>
+<li><strong>Decision.</strong> <code>fuse()</code> scores, gates and selects one candidate (or none), with provenance.</li>
+<li><strong>Tracker.</strong> <code>Tracker.update</code> predicts, corrects with the selected measurement, and advances the state
+machine.</li>
+<li><strong>LOS.</strong> The estimate&#39;s pixel offset from the image centre becomes an angular error.</li>
+<li><strong>PID.</strong> <code>PIDAngleController.compute</code> produces pan/tilt rate commands (or the scan point is tracked
+in SEARCH).</li>
+<li><strong>Mount.</strong> <code>ReceiverMount.step</code> applies rate saturation, acceleration and travel limits and writes the
+new pose.</li>
+<li><strong>Metrics and logs.</strong> <code>MetricsEngine.onFrame</code> scores the frame against ground truth; the worker emits
+telemetry and log entries; the next frame is rendered from the new pose.</li>
+</ol>
+<hr>
+<h2>7. Virtual Environment and Camera Model</h2>
+<p><strong>IMPLEMENTED</strong> (<code>scene.ts</code>, <code>camera.ts</code>, <code>config.ts</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value (default)</th>
+<th>Configurable range</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scene</td>
+<td>2000 × 2000 px, background grey level 18</td>
+<td>2000–4096; background 0–80</td>
+</tr>
+<tr>
+<td>Starfield</td>
+<td>⌊W·H / 2600⌋ single pixels at background + 8 … + 29</td>
+<td>fixed</td>
+</tr>
+<tr>
+<td>Sensor</td>
+<td>640 × 480, monochrome, 8-bit</td>
+<td>160–1280 × 120–1024</td>
+</tr>
+<tr>
+<td>FOV</td>
+<td>4.0° × 3.0°</td>
+<td>0.5–30°</td>
+</tr>
+<tr>
+<td>Frame rate</td>
+<td>30 Hz</td>
+<td>20–120 Hz</td>
+</tr>
+<tr>
+<td>Initial pose</td>
+<td>pan = 0°, tilt = 0° (scene centre)</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<p><strong>Angular scale.</strong> The sensor samples the scene one-to-one, so</p>
+<p>\[ k_x = \frac{W_\text{img}}{\text{FOV}_x} = \frac{640}{4^\circ} = 160\ \text{px/°},\qquad k_y = \frac{480}{3^\circ} = 160\ \text{px/°}. \]</p>
+<p><strong>Projection (scene → image).</strong> The model is planar (a 2-D angular scene, not a 3-D world with a pinhole
+camera). The sensor window centre in scene pixels is</p>
+<p>\[ c_x = \tfrac{W_s}{2} + \text{pan}\cdot k_x + o_x,\qquad c_y = \tfrac{H_s}{2} + \text{tilt}\cdot k_y + o_y, \]</p>
+<p>where \((o_x, o_y)\) is the platform-motion plus jitter offset. A scene point \((X, Y)\) appears at image
+coordinates \(u = X - (c_x - W_\text{img}/2)\), \(v = Y - (c_y - H_\text{img}/2)\). Mount travel is limited so
+the window never leaves the scene: \(|\text{pan}| \le (W_s/2 - W_\text{img}/2)/k_x = 4.25°\) and
+\(|\text{tilt}| \le (H_s/2 - H_\text{img}/2)/k_y = 4.75°\) at defaults. A full 3-D world model, lens
+distortion and perspective projection are <strong>NOT IMPLEMENTED</strong>.</p>
+<hr>
+<h2>8. Optical Beacon Model</h2>
+<p><strong>IMPLEMENTED</strong> (<code>scene.ts</code>, <code>trajectories.ts</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Model</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Shape</td>
+<td>square (default) or circle (pixel-centre inside radius)</td>
+</tr>
+<tr>
+<td>Size</td>
+<td>5–20 px side/diameter, default 10</td>
+</tr>
+<tr>
+<td>Intensity</td>
+<td>grey level = round(235 × intensity), intensity 0.2–1.0, default 1.0</td>
+</tr>
+<tr>
+<td>Start</td>
+<td>user-defined, or random within ±220 px of scene centre on both axes</td>
+</tr>
+<tr>
+<td>Visibility</td>
+<td>hidden during blink-off, or by the debug &quot;kill beacon&quot; control</td>
+</tr>
+<tr>
+<td>Blur</td>
+<td>optional Gaussian PSF, σ 0–4 px (default 0)</td>
+</tr>
+<tr>
+<td>Motion smear</td>
+<td>optional, from exposure time 0–33 ms (default 0)</td>
+</tr>
+</tbody></table>
+<p><strong>Trajectories</strong> (scene px; <code>speed</code> multiplier default 1.2):</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Equation / behaviour (from source)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Straight</td>
+<td>constant velocity of 60·speed px/s at a seeded random heading, reflecting at scene margins</td>
+</tr>
+<tr>
+<td>Circular</td>
+<td>\(x = c_x + r(\cos a - 1),\ y = c_y + r\sin a\), \(a = \omega t\) (circle passes through the start point)</td>
+</tr>
+<tr>
+<td>Figure-8</td>
+<td>\(x = c_x + a\sin\omega t,\ y = c_y + b\sin(2\omega t + \varphi)\)</td>
+</tr>
+<tr>
+<td>Random</td>
+<td>velocity re-drawn and smoothed (\(v \leftarrow 0.55v + 0.45 v_\text{new}\)) at 90·speed px/s, bounded</td>
+</tr>
+<tr>
+<td>Spiral</td>
+<td>outward spiral, radius growing linearly from 0</td>
+</tr>
+<tr>
+<td>Sinusoidal</td>
+<td>\(x = c_x + a\sin(0.7\omega t),\ y = c_y + b\sin\omega t + \text{drift}\), clamped</td>
+</tr>
+</tbody></table>
+<p><strong>Ground truth vs observation.</strong> The beacon&#39;s trajectory position is the <em>ground truth</em>. It is used (i)
+to render the scene and (ii) by the metrics engine to score the run. The detector, track bank, verifier,
+decision engine, Kalman filter and controller receive only the <em>observation</em> — the disturbed frame — plus
+the system&#39;s own state (its Kalman estimate and mount encoder pose). This is enforced by tests that
+inspect the source of every perception and control file for ground-truth identifiers
+(<code>tests/engine-evidence.test.ts</code>, <code>tests/ai-integrity.test.ts</code>, <code>tests/ai-runtime.test.ts</code>).</p>
+<hr>
+<h2>9. Disturbance Model</h2>
+<p><strong>IMPLEMENTED.</strong> Applied in this order to the observed frame only (<code>applyDisturbances</code>, <code>camera.ts</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Disturbance</th>
+<th>Physical interpretation</th>
+<th>Implementation</th>
+<th>Parameters</th>
+<th>Effect on tracking</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Salt &amp; pepper</td>
+<td>dead/hot pixels, bit errors</td>
+<td>⌊p·N⌋ random pixels set to 0 or 255</td>
+<td>0–40 % (PS suggests 10 %)</td>
+<td>isolated false peaks</td>
+</tr>
+<tr>
+<td>Gaussian</td>
+<td>read/thermal noise</td>
+<td>\(v \leftarrow v + \sigma\,\mathcal N(0,1)\), clipped 0–255</td>
+<td>σ 0–20</td>
+<td>blob-edge jitter, threshold crossings</td>
+</tr>
+<tr>
+<td>Poisson</td>
+<td>photon shot noise</td>
+<td>normal approximation, λ = v/12, \(v' = 12(\lambda + \sqrt\lambda\,\mathcal N)\)</td>
+<td>on/off</td>
+<td>intensity-dependent fluctuation</td>
+</tr>
+<tr>
+<td>Atmosphere</td>
+<td>haze, fog, rain, low light</td>
+<td>\(v' = (v-24)\,c + 24\,b + (1-b)\cdot 90\)</td>
+<td>haze c ≤ 0.55, b ≤ 0.9; fog 0.32/0.78; rain 0.70/0.85; low light 0.80/0.45</td>
+<td>contrast loss; background lift</td>
+</tr>
+<tr>
+<td>Rain streaks</td>
+<td>rain drops</td>
+<td>70 streaks of 5–16 px, +22…+47 grey levels</td>
+<td>rain mode</td>
+<td>false elongated candidates</td>
+</tr>
+<tr>
+<td>Camera jitter</td>
+<td>high-frequency platform vibration</td>
+<td>per-axis \(\mathcal N(0, (j/2)^2)\) offset, magnitude clamped to \(j\)</td>
+<td>j = 0–20 px/frame</td>
+<td>image shifts between frames</td>
+</tr>
+<tr>
+<td>Platform motion</td>
+<td>slow platform movement</td>
+<td>analytic offsets: linear, circular, figure-8, spiral, random</td>
+<td>amplitude 0–20 px, speed 0.05–4</td>
+<td>apparent target motion</td>
+</tr>
+<tr>
+<td>Optical blur</td>
+<td>defocus, turbulence spreading</td>
+<td>separable Gaussian PSF on every spot</td>
+<td>σ 0–4 px</td>
+<td>lower peak, wider spot</td>
+</tr>
+<tr>
+<td>Motion smear</td>
+<td>exposure-time blur</td>
+<td>spot swept along relative motion over the exposure</td>
+<td>0–33 ms</td>
+<td>elongated, dimmer beacon</td>
+</tr>
+<tr>
+<td>Bright decoys</td>
+<td>other light sources</td>
+<td>static spots, 6–15 px, intensity range configurable</td>
+<td>count 0–12</td>
+<td>false locks (§31.1)</td>
+</tr>
+<tr>
+<td>Blink / kill</td>
+<td>beacon occlusion</td>
+<td>beacon not rendered</td>
+<td>period, frames</td>
+<td>detection loss, re-acquisition</td>
+</tr>
+</tbody></table>
+<p>Known modelling defect (documented, not changed, because published results depend on it): in <code>low_light</code>
+the airlight term \((1-b)\cdot90\) <em>brightens</em> the background by about +41 grey levels, lifting dim decoys
+above the classical threshold. Turbulence-induced beam wander and scintillation are <strong>NOT IMPLEMENTED</strong>.</p>
+<hr>
+<h2>10. Classical Computer-Vision Pipeline</h2>
+<p><strong>IMPLEMENTED</strong> (<code>ClassicalDetector</code>, <code>detector.ts</code>). The frames are already monochrome, so there is no
+colour conversion; <strong>no denoising, morphology or contour stage exists</strong> in the build.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What it does</th>
+<th>Parameters</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Threshold</td>
+<td>pixels with \(v \ge T\) are foreground</td>
+<td>T = 90</td>
+<td>the beacon is the brightest object in a dark sky</td>
+</tr>
+<tr>
+<td>Connected components</td>
+<td>4-connectivity iterative flood fill</td>
+<td>—</td>
+<td>groups pixels into blobs, no recursion</td>
+</tr>
+<tr>
+<td>Area filter</td>
+<td>keep blobs with area in [4, 1200] px</td>
+<td>min/max area</td>
+<td>rejects single noise pixels and huge regions</td>
+</tr>
+<tr>
+<td>Descriptors</td>
+<td>brightness = peak/255; size affinity \(s(A) = \max(0.15, A/A_0)\) if \(A \le A_0\) else \(\max(0.1, A_0/A)\) with \(A_0\) = configured size²; shape = 1/aspect</td>
+<td>—</td>
+<td>prefers the configured beacon size and compact spots</td>
+</tr>
+<tr>
+<td>Composite</td>
+<td>\(S = 0.45\,b + 0.35\,s + 0.20\,h\); confidence \(= \min(1, 1.25\,S)\)</td>
+<td>—</td>
+<td>single ranking score</td>
+</tr>
+<tr>
+<td>Temporal gate</td>
+<td>with a Kalman hint: ×1 if d &lt; 60 px, ×0.4 if d &lt; 140 px, else ×0.05</td>
+<td>—</td>
+<td>sticky tracking</td>
+</tr>
+<tr>
+<td>Cold-search floor</td>
+<td>reject if confidence &lt; 0.5 and no hint</td>
+<td>0.5</td>
+<td>stops locking onto rain/noise when the beacon is out of view</td>
+</tr>
+<tr>
+<td>Centroid</td>
+<td>intensity-weighted centroid of the chosen blob</td>
+<td>—</td>
+<td>sub-pixel position</td>
+</tr>
+</tbody></table>
+<p>Advantages: deterministic, ~0.3–0.5 ms per frame (MEASURED, §28.4), excellent localisation (0.8 px
+centroiding error, §29.2). Limitations: a fixed threshold misses a beacon below it (§27: dim beacon, recall
+0), and it has no way to tell a decoy from the beacon except configured size and brightness. Classical CV
+is retained in the hybrid because it is the more accurate localiser and an independent second opinion.</p>
+<hr>
+<h2>11. AI Model</h2>
+<p><strong>IMPLEMENTED.</strong> The model is <strong>not YOLO</strong> and does not regress bounding boxes. It is a binary ROI
+classifier, <em>TinyBeaconNet</em>, applied to candidate locations, plus a second learned model that judges
+candidate <em>tracks</em>. Both are specified in Appendix B.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>TinyBeaconNet <code>beacon-roi-v2</code></th>
+<th>Track verifier <code>track-verifier-v1</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Family</td>
+<td>small CNN, binary classifier</td>
+<td>multilayer perceptron, binary classifier</td>
+</tr>
+<tr>
+<td>Architecture</td>
+<td>conv3×3 1→8, ReLU, max-pool 2 · conv3×3 8→12, ReLU, max-pool 2 · conv3×3 12→16, ReLU · global average pool · dense 16→16, ReLU · dense 16→1, sigmoid</td>
+<td>standardise (train mean/std) · dense 8→12, ReLU · dense 12→1, sigmoid</td>
+</tr>
+<tr>
+<td>Parameters</td>
+<td>2,989</td>
+<td>121 (8·12+12+12+1)</td>
+</tr>
+<tr>
+<td>Input</td>
+<td><code>patches</code> float32 [N, 1, 24, 24]</td>
+<td><code>features</code> float32 [N, 8]</td>
+</tr>
+<tr>
+<td>Output</td>
+<td><code>p_beacon</code> [N, 1], P(ROI contains beacon)</td>
+<td><code>p_beacon</code> [N, 1], calibrated P(track is beacon)</td>
+</tr>
+<tr>
+<td>Classes</td>
+<td>1 (beacon) vs background</td>
+<td>1 (beacon track) vs other</td>
+</tr>
+<tr>
+<td>Thresholds</td>
+<td><code>ai</code> detector accepts ≥ 0.50; hybrid: veto below 0.35, reject below 0.12 without temporal support, AI-only spot needs ≥ 0.60</td>
+<td>decoy ≤ 0.20 (age ≥ 30); verified ≥ 0.75 (age ≥ 15); AI-only start ≥ 0.5 (age ≥ 10)</td>
+</tr>
+<tr>
+<td>NMS</td>
+<td>none in the model; the proposer applies 10 px non-maximum suppression</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Format / runtime</td>
+<td>ONNX opset 17, ONNX Runtime Web 1.30.0 (WASM)</td>
+<td>same</td>
+</tr>
+<tr>
+<td>File / SHA-256</td>
+<td><code>beacon-roi-v2.onnx</code> (14,422 B) <br/><code class="hash">1bb8a7ded0f6d9b1bd34b103e383ef66f1be33af3ae000f2f8b623a24e84ffbb</code></td>
+<td><code>track-verifier-v1.onnx</code> (1,196 B) <br/><code class="hash">c5fd64314968a0b0a5189f9dc02b313076beca9174b3e7221a40e8de729d67ad</code></td>
+</tr>
+</tbody></table>
+<p><strong>Why this model.</strong> The plan&#39;s Phase 12 required full-frame detection (Mode 1) and candidate verification
+(Mode 2) to be implemented and measured. Both were: the same CNN applied densely over the 640 × 480 frame
+costs 822 ms per frame against 9.9 ms for Mode 2 (MEASURED, §28.5) — far beyond the
+33.3 ms budget at 30 Hz. The beacon is 5–20 px in a 307,200-pixel frame, so a full-frame network spends
+almost all its arithmetic on empty sky. A 24 × 24 crop around each candidate is enough context.</p>
+<hr>
+<h2>12. Dataset</h2>
+<h3>12.1 Real data — Zenodo laser-spot set</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value (verified from the files)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Source</td>
+<td>D. Torielli, <em>Laser Pointer Spot Annotated RGB Images</em>, Zenodo, v2, 2025, DOI 10.5281/zenodo.15230870 [2]</td>
+</tr>
+<tr>
+<td>Licence</td>
+<td>CC BY 4.0</td>
+</tr>
+<tr>
+<td>Training images</td>
+<td>309 (<code>train</code>) + 76 (<code>valid</code>) = 385, Intel RealSense D435, 1280 × 720</td>
+</tr>
+<tr>
+<td>Test images</td>
+<td>56, smartphone camera, 1280 × 720, 45 spot annotations (some images have none)</td>
+</tr>
+<tr>
+<td>Annotation format</td>
+<td>YOLO (train/valid), COCO (test)</td>
+</tr>
+<tr>
+<td>Classes</td>
+<td>1, <code>Laser</code></td>
+</tr>
+<tr>
+<td>Content</td>
+<td>laser-pointer spots projected on indoor surfaces of different materials and colours</td>
+</tr>
+</tbody></table>
+<p><strong>Why it is useful but not sufficient.</strong> It is real optical-spot data from two different cameras, which
+gives a genuine cross-camera generalisation test. But it is not the FSOC domain: indoor lit scenes, no
+dark sky, no atmospheric attenuation, no sensor-noise model, no platform motion, no competing bright
+objects. A measurement on this set shows the spot is the frame&#39;s brightest pixel in only 21 % of images,
+so even its proposal mechanism had to differ (local contrast, not global threshold).</p>
+<h3>12.2 Synthetic FSOC data</h3>
+<p>Generated by <code>scripts/gen-synthetic-dataset.ts</code>, which drives the shipped <code>SimulationRunner</code> with randomised
+recipes (beacon size/intensity/shape, decoys, noise family, atmosphere, jitter, platform motion, optical
+blur on 50 % of recipes, exposure smear on 40 %). Ground truth writes the YOLO labels only.</p>
+<table>
+<thead>
+<tr>
+<th>Split</th>
+<th>Recipes</th>
+<th>Seeds</th>
+<th>Images</th>
+<th>With beacon / empty</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>train</td>
+<td>180</td>
+<td>700,000 + 17k</td>
+<td>5,040</td>
+<td>—</td>
+</tr>
+<tr>
+<td>valid</td>
+<td>45</td>
+<td>900,000 + 17k</td>
+<td>1,260</td>
+<td>—</td>
+</tr>
+<tr>
+<td>test_stress (<strong>locked</strong>)</td>
+<td>40</td>
+<td>1,100,000 + 17k</td>
+<td>1,120</td>
+<td>—</td>
+</tr>
+<tr>
+<td>total</td>
+<td>265</td>
+<td>—</td>
+<td>7,420</td>
+<td>5,120 / 2,300</td>
+</tr>
+</tbody></table>
+<h3>12.3 Splits used for training</h3>
+<table>
+<thead>
+<tr>
+<th>Split</th>
+<th>Patches (pos / neg)</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>real_train</td>
+<td>3,849 (1,995 / 1,854)</td>
+<td>Stage A training</td>
+</tr>
+<tr>
+<td>real_valid</td>
+<td>897 (441 / 456)</td>
+<td>Stage A model selection</td>
+</tr>
+<tr>
+<td>synth_train</td>
+<td>49,406 (24,626 / 24,780)</td>
+<td>Stage B training</td>
+</tr>
+<tr>
+<td>synth_valid</td>
+<td>12,488 (6,328 / 6,160)</td>
+<td>Stage B model selection</td>
+</tr>
+<tr>
+<td>real_test (<strong>locked</strong>)</td>
+<td>615 (315 / 300)</td>
+<td>reported once</td>
+</tr>
+<tr>
+<td>synth_stress_test (<strong>locked</strong>)</td>
+<td>10,486 (4,886 / 5,600)</td>
+<td>reported once</td>
+</tr>
+</tbody></table>
+<p>The track verifier uses a separate dataset of candidate <em>tracks</em> harvested from 180 closed-loop simulator
+recipes (<code>scripts/ai/gen-track-dataset.ts</code>): 29,180 training samples (9,876 beacon), 5,955 validation and
+7,415 locked test, from disjoint seed ranges (2,000,000 / 2,500,000 / 2,900,000 + 13k).</p>
+<hr>
+<h2>13. Data Preprocessing and Augmentation</h2>
+<p><strong>IMPLEMENTED</strong> (<code>scripts/ai/common.py</code>, mirrored bit-for-bit in <code>src/engine/nn.ts</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Image format</td>
+<td>8-bit greyscale (real RGB images converted with PIL <code>convert(&#39;L&#39;)</code>)</td>
+</tr>
+<tr>
+<td>Resizing</td>
+<td><strong>none</strong> — ROIs are cut at native resolution</td>
+</tr>
+<tr>
+<td>ROI crop</td>
+<td>24 × 24 window centred on the candidate, edge replication at borders</td>
+</tr>
+<tr>
+<td>Normalisation</td>
+<td>subtract median of the 2-px border ring, divide by 128, clip to [−1, 2]</td>
+</tr>
+<tr>
+<td>Positives</td>
+<td>true spot centres plus 6 jittered copies: (2,−1), (−2,1), (1,2), (−1,−2), (3,0), (0,−3) px</td>
+</tr>
+<tr>
+<td>Negatives</td>
+<td>top-hat (image − 15×15 box mean) peaks, contrast ≥ 12, NMS 10 px, ≥ 22 px from any spot; ≤ 6 per image (≤ 5 synthetic)</td>
+</tr>
+<tr>
+<td>Test isolation</td>
+<td>the smartphone set is read only into <code>real_test</code>; the stress split only into <code>synth_stress_test</code></td>
+</tr>
+<tr>
+<td>Augmentation (training only)</td>
+<td>random 90° rotations and horizontal flips; amplitude × U(0.75, 1.3); additive Gaussian noise σ = 0.035 (normalised units)</td>
+</tr>
+</tbody></table>
+<p>Scale, crop-shift, contrast and blur augmentations beyond the above are <strong>NOT IMPLEMENTED</strong> as
+augmentations; blur and smear enter through the synthetic generator instead.</p>
+<hr>
+<h2>14. Two-Stage Training</h2>
+<p><strong>IMPLEMENTED</strong> (<code>scripts/ai/train_roi.py</code>). MEASURED results from <code>public/models/beacon-roi-v2.json</code>.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Stage A</th>
+<th>Stage B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Data</td>
+<td>real_train</td>
+<td>real_train + synth_train (real kept to avoid forgetting)</td>
+</tr>
+<tr>
+<td>Selection</td>
+<td>real_valid F1</td>
+<td>real_valid + synth_valid F1</td>
+</tr>
+<tr>
+<td>Epochs</td>
+<td>40</td>
+<td>40</td>
+</tr>
+<tr>
+<td>Optimiser / LR</td>
+<td>Adam, 2 × 10⁻³, cosine annealing</td>
+<td>Adam, 1 × 10⁻³, cosine annealing</td>
+</tr>
+<tr>
+<td>Batch size</td>
+<td>256</td>
+<td>256</td>
+</tr>
+<tr>
+<td>Loss</td>
+<td>binary cross-entropy with logits</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Seed</td>
+<td>7</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Hardware</td>
+<td>CPU (PyTorch 2.14.0+cpu), Intel Core i3-1215U</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Training time</td>
+<td>not recorded</td>
+<td>not recorded</td>
+</tr>
+</tbody></table>
+<p><img src="figures/fig10_cnn_training.png" alt="CNN F1 per stage"></p>
+<p class="caption">Figure 1. TinyBeaconNet F1 after each stage (MEASURED). Stage A alone reaches F1 0.8891 on real
+data but only 0.3314 on the FSOC domain — the case for Stage B.</p><p><strong>Domain gap.</strong> Stage A teaches real optical-spot appearance; on simulator data it scores F1
+0.3314, barely better than chance. Stage B adds the FSOC domain. <strong>Overfitting control:</strong> best
+epoch selected on validation only; small model; augmentation. <strong>Leakage control:</strong> locked splits read once
+at the end; disjoint seed ranges for every synthetic split. <strong>Track verifier</strong> (<code>train_track_verifier.py</code>):
+40 epochs, Adam 3 × 10⁻³, batch 1,024, <em>unweighted</em> BCE (an earlier class-weighted version produced
+inflated, uncalibrated probabilities), epoch selected on validation log-loss.</p>
+<hr>
+<h2>15. AI Inference Pipeline and Runtime</h2>
+<div class="mermaid">flowchart LR
+  T["PyTorch training<br/>train_roi.py · train_track_verifier.py"] --> W["Shipped weights<br/>beacon-roi-v2.bin · track-verifier-v1.json"]
+  W --> X["export_onnx.py<br/>torch 2.14 TorchScript exporter, opset 17"]
+  X --> O["beacon-roi-v2.onnx · track-verifier-v1.onnx<br/>+ onnx-manifest.json (SHA-256)"]
+  O --> R["ONNX Runtime Web 1.30.0<br/>WASM, 1 thread, in the simulation Web Worker"]
+  R --> D["detectAsync → fuse() → Kalman"]
+</div>
+<p>At runtime (<code>HybridFusionDetector.detectAsync</code>): candidates → <code>buildPatchBatch</code> (identical crop and
+normalisation) → one <code>InferenceSession.run</code> → probabilities → track bank → feature rows → one verifier
+<code>run</code> → <code>fuse()</code>. The ONNX graphs include the sigmoid and (for the verifier) the standardisation.
+Execution mode: <strong>CPU via WebAssembly</strong>, single thread, no proxy worker; no GPU, WebGPU or WebGL
+provider is used. WASM artefacts are served from the app (<code>public/ort/</code>), so the system runs offline.</p>
+<table>
+<thead>
+<tr>
+<th>Verification (MEASURED)</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ONNX vs PyTorch (export script)</td>
+<td>max |Δ| 3.6 × 10⁻⁷ (CNN), 7.5 × 10⁻⁸ (verifier)</td>
+</tr>
+<tr>
+<td>ORT vs TypeScript on a live browser frame</td>
+<td>|Δ| 5.5 × 10⁻⁸ (<code>benchmark-results/browser-e2e/evidence.json</code>)</td>
+</tr>
+<tr>
+<td>ORT vs TypeScript decisions, 240 closed-loop frames</td>
+<td>identical (<code>tests/ai-runtime.test.ts</code>)</td>
+</tr>
+<tr>
+<td>Browser session creation</td>
+<td>477 ms (Chrome, 2026-10-04)</td>
+</tr>
+</tbody></table>
+<p>If ORT cannot start, the worker logs a warning and uses the in-engine TypeScript forward pass of the same
+weights; every frame&#39;s provenance records which runtime produced the scores, so this cannot be hidden.</p>
+<hr>
+<h2>16. Classical CV + AI Fusion</h2>
+<p><strong>Why neither alone.</strong> Classical CV finds compact bright blobs quickly and localises them precisely, but
+cannot distinguish a decoy from the beacon and cannot see below its threshold. The CNN recognises
+&quot;optical spot&quot; vs &quot;not a spot&quot; across cameras, but — measured — cannot reject bright decoys, because
+PS-169 lets the beacon be 5–20 px and the decoys are 6–15 px: &quot;wrong size&quot; is not a property the model is
+allowed to learn. On its own the CNN&#39;s appearance score separates beacon tracks from decoy tracks at only
+AUC 0.755 (§28.2). What separates them is <em>behaviour over time</em>: decoys are fixed in the world; the beacon
+rides a mobile terminal.</p>
+<p><strong>Candidate generation.</strong> Classical candidates (≤ 12) and AI-branch spots (≤ 6) are merged; a spot found
+by both (≤ 6 px apart) becomes one candidate labelled <code>both</code> with the classical geometry.</p>
+<p><strong>Temporal evidence (track bank).</strong> Each candidate&#39;s world position is computed from the mount&#39;s own
+encoder pose: \(w_x = \text{pan}\cdot k_x + (u - 320)\). When ≥ 3 tracks are matched, the median
+frame-to-frame displacement (common-mode shake: jitter and platform motion) is removed. Association is
+greedy nearest-first within 30 px (60 px if common-mode cannot be estimated). Each track keeps a 30-frame
+history; world speed is the least-squares slope; reliability \(= \min(1, (n-1)/20)\). Features: mean CNN
+score, mean classical composite, mean size affinity, mean brightness, speed, reliability, speed ×
+reliability, persistence (EMA weight 0.2). Tracks ≥ 45 frames old with P ≤ 0.20 are written to a
+<strong>clutter map</strong> (30 px radius).</p>
+<p><strong>Decision formula</strong> (<code>fuse()</code>, <code>fusion.ts</code>). For candidate \(i\) with classical confidence \(c_i\), shape
+\(h_i\), brightness \(b_i\), CNN score \(a_i\), distance \(d_i\) to the Kalman prediction and verifier
+probability \(p_i\):</p>
+<p>\[ m_i = \frac{1}{1 + (d_i/45)^2}\ \ (\text{0.5 if no prediction}),\qquad \text{veto}(a_i) = \begin{cases} 0.3\,(a_i - 0.35)/0.35 &amp; a_i &lt; 0.35\\ 0 &amp; \text{otherwise}\end{cases} \]</p>
+<p>\[ S_i = w_c c_i + w_m m_i + w_h h_i + w_b b_i + \text{veto}(a_i) + 0.4\,(p_i - 0.5)\cdot[\text{age}_i \ge 6] \]</p>
+<p>with \((w_c, w_m, w_h, w_b) = (0.58, 0, 0.17, 0.25)\) in cold search and \((0.30, 0.55, 0.06, 0.09)\) when a
+prediction exists. While locked, a candidate more than 55 px from the incumbent is multiplied by 0.45
+(hysteresis) unless it is a <em>verified challenger</em> (age ≥ 15, \(p \ge 0.75\), and the incumbent&#39;s $p \le
+0.35$ or exceeded by ≥ 0.35); in that case proximity to the incumbent&#39;s own prediction is treated as
+neutral. Reported confidence \(= \min(1, 1.15\,S)\); in cold search a choice below 0.5 is rejected.</p>
+<p><strong>Hard rejection gates</strong> (in order): (1) CNN &lt; 0.12 with no temporal support; (2) AI-only spot with CNN &lt;
+0.60 and no temporal support; (3) AI-only spot not yet verified (age &lt; 10 or \(p\) &lt; 0.5); (4) established
+decoy: age ≥ 30 and \(p \le 0.20\), <em>even if exactly where the Kalman filter predicts</em>; (5) on the clutter
+map with no temporal support. &quot;Temporal support&quot; = a prediction exists, it is not doubted, and $m_i \ge
+0.35$.</p>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CV and AI agree</td>
+<td><code>agreement</code>; classical geometry used</td>
+</tr>
+<tr>
+<td>CV and AI disagree</td>
+<td>weighted score decides; recorded as <code>disagreed</code></td>
+</tr>
+<tr>
+<td>AI strongly rejects a CV candidate</td>
+<td>rejected unless temporally supported (edge-clipped or fogged beacon on its predicted path)</td>
+</tr>
+<tr>
+<td>CV finds, AI does not</td>
+<td>still scored; CNN only vetoes, never promotes</td>
+</tr>
+<tr>
+<td>AI finds, CV does not</td>
+<td>allowed only after the CNN (≥ 0.6) and the verifier (age ≥ 10, \(p\) ≥ 0.5) agree</td>
+</tr>
+<tr>
+<td>No candidate</td>
+<td>no measurement; tracker predicts, then searches</td>
+</tr>
+<tr>
+<td>Multiple candidates</td>
+<td>highest score after gates and hysteresis</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>17. Decision State Machine</h2>
+<p><strong>IMPLEMENTED</strong> (<code>tracker.ts</code>). States: <code>SEARCH</code>, <code>CANDIDATE</code>, <code>ACQUIRE</code>, <code>TRACK</code>, <code>PREDICT_REACQUIRE</code>.
+There is no separate <code>LOST</code> state; loss returns to <code>SEARCH</code>.</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Entry</th>
+<th>Actions</th>
+<th>Exit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SEARCH</td>
+<td>start; candidate disconfirmed; prediction timed out</td>
+<td>camera follows an expanding scan pattern; no prediction hint</td>
+<td>any accepted detection → CANDIDATE</td>
+</tr>
+<tr>
+<td>CANDIDATE</td>
+<td>first detection</td>
+<td>Kalman initialised; camera steers to estimate</td>
+<td>2 consecutive detections → ACQUIRE; 8 misses → SEARCH</td>
+</tr>
+<tr>
+<td>ACQUIRE</td>
+<td>2nd detection; or a deliberate target switch</td>
+<td>confirm</td>
+<td>streak ≥ 3 → TRACK (acquisition or re-acquisition event); 8 misses → SEARCH</td>
+</tr>
+<tr>
+<td>TRACK</td>
+<td>confirmed</td>
+<td>PID on Kalman estimate</td>
+<td>2 misses → PREDICT_REACQUIRE (loss event); <code>newTarget</code> → ACQUIRE</td>
+</tr>
+<tr>
+<td>PREDICT_REACQUIRE</td>
+<td>short loss</td>
+<td>Kalman coasts; camera follows prediction</td>
+<td>detection → TRACK (re-acquisition); 30 misses → SEARCH</td>
+</tr>
+</tbody></table>
+<p>A detection more than 50 px from the previous one during CANDIDATE/ACQUIRE restarts the confirmation
+streak. When the hybrid deliberately moves to a different object while locked (<code>newTarget</code>), the Kalman
+state is reset, the switch is recorded as a loss followed by a re-acquisition, and the new target must be
+re-confirmed. <strong>Why AI must not drive the camera directly:</strong> a per-frame score has no memory; a single
+confident decoy frame would slew the mount. Every detection passes through the same confirmation,
+gating and hysteresis.</p>
+<p><strong>Temporal-consistency bug and fix (part of the final build).</strong> With no Kalman prediction, motion
+consistency is a neutral 0.5 so that candidates are not penalised for evidence they cannot have. An early
+version read that 0.5 as <em>temporal support</em>, which disabled the CNN&#39;s rejection gate for the whole of
+SEARCH — exactly when false locks form. Fix: temporal support requires that a prediction exists (and,
+in the final build, is not doubted). Regression test: <code>tests/ai-integrity.test.ts</code>, &quot;the model can veto
+during a cold search&quot;.</p>
+<hr>
+<h2>18. Kalman Filter</h2>
+<p><strong>IMPLEMENTED</strong> (<code>Kalman2D</code>, <code>kalman.ts</code>). State \(\mathbf s = [x, y, v_x, v_y]^\top\) in image pixels;
+constant-velocity model.</p>
+<p>\[ \mathbf F = \begin{bmatrix} 1&amp;0&amp;\Delta t&amp;0\\ 0&amp;1&amp;0&amp;\Delta t\\ 0&amp;0&amp;1&amp;0\\ 0&amp;0&amp;0&amp;1\end{bmatrix},\qquad \mathbf H = \begin{bmatrix}1&amp;0&amp;0&amp;0\\0&amp;1&amp;0&amp;0\end{bmatrix} \]</p>
+<p>Prediction: \(\hat{\mathbf s}^- = \mathbf F\hat{\mathbf s}\), \(\mathbf P^- = \mathbf F\mathbf P\mathbf F^\top + \mathbf Q\) with
+\(\mathbf Q = \text{diag}(q, q, q/2, q/2)\) (velocity cross-covariance reset to 0). Update:
+\(\mathbf K = \mathbf P^-\mathbf H^\top(\mathbf H\mathbf P^-\mathbf H^\top + \mathbf R)^{-1}\),
+\(\hat{\mathbf s} = \hat{\mathbf s}^- + \mathbf K(\mathbf z - \mathbf H\hat{\mathbf s}^-)\),
+\(\mathbf P = (\mathbf I - \mathbf K\mathbf H)\mathbf P^-\), with \(\mathbf R = r\,\mathbf I_2\). Defaults: \(q = 0.6\), $r =
+4.0\(. On the first measurement the state is set to it with zero velocity and \)\mathbf P = \text{diag}(r, r, 25,
+25)$. A singular innovation covariance skips the update. Prediction runs every frame, measurement or not,
+which smooths frame-to-frame detection jitter and carries the estimate through short gaps (the judge demo
+coasts 0.93 s on prediction, §29.2).</p>
+<hr>
+<h2>19. LOS / Angular Error</h2>
+<p><strong>IMPLEMENTED</strong> (<code>PIDAngleController.compute</code>). With the target estimate \((x, y)\) and image centre $(320,
+240)$:</p>
+<p>\[ e_x = x - 320,\quad e_y = y - 240,\qquad \theta_x = \frac{e_x}{640}\cdot 4^\circ,\quad \theta_y = \frac{e_y}{480}\cdot 3^\circ \]</p>
+<p>so 16 px of error is 0.1° (asserted in <code>tests/engine-unit.test.ts</code>). \(\theta_x\) drives pan and
+\(\theta_y\) drives tilt. Lens intrinsics beyond FOV/resolution are <strong>NOT IMPLEMENTED</strong> (no distortion).</p>
+<hr>
+<h2>20. PID Controller</h2>
+<p><strong>IMPLEMENTED</strong> (<code>pid.ts</code>), in angle space:</p>
+<p>\[ u = K_p\,\theta + K_i \int \theta\,dt + K_d\,\frac{d\theta}{dt},\qquad u \in [-\omega_{max}, +\omega_{max}] \]</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value (default)</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>\(K_p\)</td>
+<td>2.2</td>
+<td>rate proportional to angular error</td>
+</tr>
+<tr>
+<td>\(K_i\)</td>
+<td>0.25</td>
+<td>removes steady lag behind a moving target</td>
+</tr>
+<tr>
+<td>\(K_d\)</td>
+<td>0.35</td>
+<td>damps overshoot</td>
+</tr>
+<tr>
+<td>Integrator clamp</td>
+<td>±8 °·s</td>
+<td>anti-windup</td>
+</tr>
+<tr>
+<td>Deadband</td>
+<td>0.02° on both axes</td>
+<td>no command when centred</td>
+</tr>
+<tr>
+<td>Output saturation</td>
+<td>±max pan/tilt speed (5 °/s)</td>
+<td>respects PS rows 13–14</td>
+</tr>
+<tr>
+<td>Integrator reset</td>
+<td>on entering SEARCH or ACQUIRE</td>
+<td>prevents stale integral after loss</td>
+</tr>
+</tbody></table>
+<p>In SEARCH the same controller tracks a moving scan point (<code>ScanPattern</code>: raster or spiral, expanding
+from where the camera points, at 0.9 × max slew). PID is used because the plant (a rate-commanded
+mount) is simple and its behaviour is transparent and tunable; model-predictive or adaptive control is
+<strong>NOT IMPLEMENTED</strong>.</p>
+<hr>
+<h2>21. Virtual Pan-Tilt Mount</h2>
+<p><strong>IMPLEMENTED</strong> (<code>ReceiverMount.step</code>, <code>mount.ts</code>). The mount is the only code that changes camera pose.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Model</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Command</td>
+<td>pan/tilt rate (°/s) from the controller</td>
+</tr>
+<tr>
+<td>Rate saturation</td>
+<td>±max pan/tilt speed (default 5 °/s)</td>
+</tr>
+<tr>
+<td>Acceleration limit</td>
+<td>40 °/s² (configurable 5–500); reaches 5 °/s in ~0.13 s</td>
+</tr>
+<tr>
+<td>Travel limit</td>
+<td>pose clamped so the window stays in the scene; rate zeroed at the stop</td>
+</tr>
+<tr>
+<td>Integration</td>
+<td>pose += achieved rate × Δt</td>
+</tr>
+<tr>
+<td>Telemetry</td>
+<td>commanded and achieved rates, saturation/acceleration/travel flags, effort</td>
+</tr>
+</tbody></table>
+<p>Response delay beyond the acceleration limit, backlash and resonance are <strong>NOT IMPLEMENTED</strong>.</p>
+<p><img src="figures/fig03_pan_tilt.png" alt="Pan and tilt"></p>
+<p class="caption">Figure 2. Controller command vs achieved mount rate (MEASURED, hybrid, decoy scene, seed 4402,
+<code>scripts/report-timeseries.ts</code>). The two differ during transients because of the acceleration limit.</p><hr>
+<h2>22. Tracking Lifecycle — a Measured Example</h2>
+<p>Bright-decoy scene, seed 4402, hybrid detector on ONNX Runtime Web (<code>docs/report/data/hybrid_decoys_4402.csv</code>):</p>
+<ol>
+<li><strong>t = 0.03 s.</strong> The beacon is outside the FOV; a bright decoy is in view. The classical branch and the
+CNN both rate the decoy highly; the system enters CANDIDATE, then TRACK on the decoy at t ≈ 0.10 s.</li>
+<li><strong>t ≈ 0.1–1 s.</strong> The decoy&#39;s track ages. Its world speed stays ≈ 0 px/s; the verifier&#39;s P(beacon)
+falls.</li>
+<li><strong>t ≈ 1 s.</strong> The beacon enters the FOV; its track shows ≈ 100–400 px/s world motion and P → 0.99.
+The decoy (P ≤ 0.20, age ≥ 30) is rejected outright and written to the clutter map; the verified
+challenger takes the lock; the tracker re-confirms (loss + re-acquisition events).</li>
+<li><strong>t &gt; 1.5 s.</strong> Error stays mostly between 1 and 10 px for the rest of the run (Figure 3).</li>
+</ol>
+<p>With the classical detector the identical scene never leaves the decoy (mean error 429 px, 0 % correct
+lock). When the target leaves the FOV, the tracker coasts on prediction for up to 30 frames
+(PREDICT_REACQUIRE), then returns to SEARCH, whose scan starts from where the camera is pointing.</p>
+<p><img src="figures/fig01_error_decoys.png" alt="Error vs time"></p>
+<p class="caption">Figure 3. Tracking error vs time, same scene and seed, classical vs hybrid (MEASURED).</p><p><img src="figures/fig02_target_vs_estimate.png" alt="Target vs estimate"></p>
+<p class="caption">Figure 4. Ground-truth beacon position (scoring only) vs Kalman estimate, hybrid (MEASURED).</p><p><img src="figures/fig04_confidences.png" alt="Confidences"></p>
+<p class="caption">Figure 5. Classical confidence, CNN score, verifier probability and fused confidence vs time
+(MEASURED). The classical and CNN scores stay near 1 for both the decoy and the beacon; only the
+verifier separates them.</p><hr>
+<h2>23. Performance Metrics</h2>
+<p><strong>IMPLEMENTED</strong> (<code>metrics.ts</code>, <code>scripts/eval-detectors.ts</code>). Ground truth is used here and only here.</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Definition (as computed)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Acquisition time</td>
+<td>\(t\) of the first frame in TRACK (any lock, PS definition)</td>
+</tr>
+<tr>
+<td>Correct acquisition (evaluation only)</td>
+<td>\(t\) of the first frame in TRACK/PREDICT with error ≤ lock radius (10 px)</td>
+</tr>
+<tr>
+<td>Tracking error</td>
+<td>\(e = \lVert \hat{\mathbf p}_\text{Kalman} - \mathbf p_\text{GT}\rVert_2\) per frame with an estimate</td>
+</tr>
+<tr>
+<td>Average / max / RMSE error</td>
+<td>mean, maximum, \(\sqrt{\text{mean}(e^2)}\) over those frames; p95/p99 also reported</td>
+</tr>
+<tr>
+<td>Centroiding error</td>
+<td>\(\lVert \mathbf p_\text{detector} - \mathbf p_\text{GT}\rVert\) when the beacon is in frame (raw detector, not Kalman)</td>
+</tr>
+<tr>
+<td>False-positive frames</td>
+<td>detections reported while the beacon is outside the frame</td>
+</tr>
+<tr>
+<td>Target loss</td>
+<td>frames in SEARCH / total frames × 100</td>
+</tr>
+<tr>
+<td>Lock retention</td>
+<td>frames locked (error ≤ 10 px) / frames in TRACK or PREDICT × 100</td>
+</tr>
+<tr>
+<td>Correct lock (evaluation only)</td>
+<td>frames locked on the beacon / frames the beacon is in view × 100</td>
+</tr>
+<tr>
+<td>Re-acquisition time</td>
+<td>\(t\)(re-entry to TRACK) − \(t\)(confirmed loss); mean and max</td>
+</tr>
+<tr>
+<td>Algorithm FPS</td>
+<td>frames processed / summed pipeline time</td>
+</tr>
+<tr>
+<td>Wall-clock FPS</td>
+<td>frames / elapsed wall time</td>
+</tr>
+<tr>
+<td>Processing / detector latency</td>
+<td>mean per-frame pipeline / detector time (ms)</td>
+</tr>
+<tr>
+<td>Detection rate, track continuity</td>
+<td>% frames with a detection; longest TRACK streak</td>
+</tr>
+<tr>
+<td>Precision / recall / miss rate (Arm A)</td>
+<td>hit = detection within 8 px of truth while visible</td>
+</tr>
+</tbody></table>
+<p>mAP is <strong>NOT MEASURED</strong> (the model does not output boxes).</p>
+<hr>
+<h2>24. Experimental Methodology</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Hardware</td>
+<td>12th Gen Intel(R) Core(TM) i3-1215U, 8 logical threads (win32)</td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Windows 11</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td>Bun 1.4.2; ONNX Runtime Web 1.30.0 (WASM, 1 thread); browser checks in Chrome 154</td>
+</tr>
+<tr>
+<td>Model versions</td>
+<td><code>beacon-roi-v2</code>, <code>track-verifier-v1</code> (hashes §11)</td>
+</tr>
+<tr>
+<td>Simulation</td>
+<td>30 Hz, fixed Δt = 1/30 s in benchmarks; scene 2000², sensor 640 × 480, FOV 4° × 3°</td>
+</tr>
+<tr>
+<td>PS-169 benchmark</td>
+<td>14 presets × 5 seeds (<code>scripts/batch-test.ts</code>), classical detector, mean of 5 seeds gated</td>
+</tr>
+<tr>
+<td>Detector comparison</td>
+<td>13 conditions × 3 detectors × 6 seeds (4200 + 101k), 25 s per run (<code>scripts/eval-resumable.sh</code>)</td>
+</tr>
+<tr>
+<td>Arm A</td>
+<td>camera frozen (controller off), detector asked cold every frame — perception only</td>
+</tr>
+<tr>
+<td>Arm B</td>
+<td>full closed loop; medians across seeds; diverged seeds (mean error &gt; 50 px) counted</td>
+</tr>
+<tr>
+<td>Seeds</td>
+<td>fixed, so every detector sees identical scenes; disjoint from all training and from development seeds (9100 + 37k) used for tuning</td>
+</tr>
+</tbody></table>
+<p>Fixed seeds make every run exactly reproducible and make detector comparisons paired: a difference
+between detectors on the same seed is caused by the detector, not by a different scene.</p>
+<hr>
+<h2>25. Benchmark Scenarios</h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Description</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PS169-01…04</td>
+<td>straight, circular, figure-8, random; clear</td>
+<td>baseline closed loop per PS motion</td>
+</tr>
+<tr>
+<td>PS169-05…07</td>
+<td>Gaussian σ 12; salt &amp; pepper 10 %; Poisson</td>
+<td>sensor noise</td>
+</tr>
+<tr>
+<td>PS169-08</td>
+<td>camera jitter ±8 px/frame</td>
+<td>vibration</td>
+</tr>
+<tr>
+<td>PS169-09…12</td>
+<td>haze, fog, rain, low light</td>
+<td>atmosphere</td>
+</tr>
+<tr>
+<td>PS169-13</td>
+<td>platform motion</td>
+<td>moving platform</td>
+</tr>
+<tr>
+<td>PS169-14</td>
+<td>high disturbance (combined)</td>
+<td>stress</td>
+</tr>
+<tr>
+<td>Clear … Low light</td>
+<td>as above, figure-8 default scene</td>
+<td>detector comparison</td>
+</tr>
+<tr>
+<td>Heavy sensor noise</td>
+<td>S&amp;P 2 %, σ 18, Poisson</td>
+<td>noise stress</td>
+</tr>
+<tr>
+<td>Camera jitter</td>
+<td>±16 px/frame</td>
+<td>vibration stress</td>
+</tr>
+<tr>
+<td>Optical blur + motion smear</td>
+<td>PSF σ 2 px, exposure 20 ms, speed 2</td>
+<td>Phase-3 effects</td>
+</tr>
+<tr>
+<td>Dim beacon</td>
+<td>intensity 0.35 (level 82 &lt; threshold 90)</td>
+<td>below classical threshold</td>
+</tr>
+<tr>
+<td>Blinking beacon</td>
+<td>blink period 4 s</td>
+<td>loss and re-acquisition</td>
+</tr>
+<tr>
+<td>Bright decoys (+ noise, + jitter)</td>
+<td>10 decoys at 62–95 % intensity</td>
+<td>false-lock resistance</td>
+</tr>
+<tr>
+<td>Judge demonstration</td>
+<td>figure-8, haze+noise, vibration, 7 s blackout</td>
+<td>scripted causal chain</td>
+</tr>
+</tbody></table>
+<p>Multiple simultaneous targets are <strong>NOT IMPLEMENTED</strong> as a scenario.</p>
+<hr>
+<h2>26. PS-169 Benchmark Results (Classical Detector)</h2>
+<p>MEASURED by <code>scripts/batch-test.ts</code> (<code>benchmark-results/2026-09-29T11-19-28-003Z/</code>); mean of 5 seeds per scenario; all five PS gates.</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Acq (s)</th>
+<th>Avg err (px)</th>
+<th>Max err (px)</th>
+<th>RMSE (px)</th>
+<th>Centroid err (px)</th>
+<th>Loss (%)</th>
+<th>Lock (%)</th>
+<th>Re-acq (s)</th>
+<th>Alg. FPS</th>
+<th>All 5 gates</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PS169-01 Straight / Clear</td>
+<td>0.10</td>
+<td>1.27</td>
+<td>11.7</td>
+<td>1.83</td>
+<td>0.81</td>
+<td>0.00</td>
+<td>99.6</td>
+<td>—</td>
+<td>3435</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-02 Circular / Clear</td>
+<td>0.10</td>
+<td>1.08</td>
+<td>12.0</td>
+<td>1.58</td>
+<td>0.85</td>
+<td>0.00</td>
+<td>99.4</td>
+<td>—</td>
+<td>4023</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-03 Figure-8 / Clear</td>
+<td>0.60</td>
+<td>6.04</td>
+<td>24.2</td>
+<td>6.76</td>
+<td>0.83</td>
+<td>1.67</td>
+<td>96.4</td>
+<td>—</td>
+<td>3989</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-04 Random / Clear</td>
+<td>0.10</td>
+<td>1.12</td>
+<td>11.3</td>
+<td>1.68</td>
+<td>0.85</td>
+<td>0.00</td>
+<td>99.4</td>
+<td>—</td>
+<td>3984</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-05 Gaussian Noise</td>
+<td>0.10</td>
+<td>1.67</td>
+<td>12.8</td>
+<td>2.37</td>
+<td>0.83</td>
+<td>0.00</td>
+<td>99.4</td>
+<td>—</td>
+<td>2941</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-06 Salt &amp; Pepper</td>
+<td>0.10</td>
+<td>1.82</td>
+<td>16.1</td>
+<td>2.64</td>
+<td>0.84</td>
+<td>0.00</td>
+<td>99.1</td>
+<td>—</td>
+<td>720</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-07 Poisson</td>
+<td>0.10</td>
+<td>1.33</td>
+<td>15.7</td>
+<td>2.06</td>
+<td>0.84</td>
+<td>0.00</td>
+<td>99.1</td>
+<td>—</td>
+<td>3069</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-08 Camera Jitter</td>
+<td>1.55</td>
+<td>7.14</td>
+<td>32.5</td>
+<td>8.19</td>
+<td>0.84</td>
+<td>4.82</td>
+<td>80.8</td>
+<td>—</td>
+<td>3968</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-09 Haze</td>
+<td>0.10</td>
+<td>1.80</td>
+<td>13.6</td>
+<td>2.44</td>
+<td>0.81</td>
+<td>0.00</td>
+<td>99.3</td>
+<td>—</td>
+<td>3940</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-10 Fog</td>
+<td>0.10</td>
+<td>1.13</td>
+<td>10.9</td>
+<td>1.57</td>
+<td>0.85</td>
+<td>0.00</td>
+<td>99.6</td>
+<td>—</td>
+<td>3983</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-11 Rain</td>
+<td>1.33</td>
+<td>6.12</td>
+<td>23.4</td>
+<td>6.87</td>
+<td>0.84</td>
+<td>4.09</td>
+<td>95.7</td>
+<td>—</td>
+<td>3766</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-12 Low Light</td>
+<td>0.10</td>
+<td>1.62</td>
+<td>10.4</td>
+<td>2.23</td>
+<td>0.83</td>
+<td>0.00</td>
+<td>99.7</td>
+<td>—</td>
+<td>3843</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-13 Platform Motion</td>
+<td>0.10</td>
+<td>1.21</td>
+<td>13.7</td>
+<td>1.82</td>
+<td>0.84</td>
+<td>0.00</td>
+<td>99.3</td>
+<td>—</td>
+<td>3953</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>PS169-14 High Disturbance</td>
+<td>0.10</td>
+<td>4.85</td>
+<td>21.0</td>
+<td>5.54</td>
+<td>0.86</td>
+<td>0.00</td>
+<td>97.0</td>
+<td>—</td>
+<td>3489</td>
+<td>PASS</td>
+</tr>
+</tbody></table>
+<p><strong>14/14 scenarios pass all five PS-169 gates</strong> (mean of 5 seeds each). &quot;—&quot; = no loss occurred, so no re-acquisition was needed.</p>
+<p><img src="figures/fig08_ps169_benchmark.png" alt="PS-169 benchmark"></p>
+<p class="caption">Figure 6. Acquisition time and average tracking error per PS-169 scenario (MEASURED).</p><p>The classical path is byte-identical to the originally published benchmark: all 70 seeded runs reproduce
+exactly after every change made for the AI work.</p>
+<hr>
+<h2>27. Classical vs AI vs Hybrid</h2>
+<p>MEASURED (learned stages on onnxruntime-web 1.30.0 (wasm, 1 thread); 25 s per run; seeds 4200, 4301, 4402, 4503, 4604, 4705); same scenarios, same seeds for all three detectors.</p>
+<h3>27.1 Closed loop (Arm B): median correct-lock % · diverged seeds out of 6</h3>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Classical</th>
+<th>AI only</th>
+<th>Hybrid</th>
+<th>Hybrid median error</th>
+<th>Hybrid correct acq</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Clear</td>
+<td>95.6 % · 0/6</td>
+<td>96.3 % · 0/6</td>
+<td>95.6 % · 0/6</td>
+<td>6.07 px</td>
+<td>0.55 s</td>
+</tr>
+<tr>
+<td>Haze</td>
+<td>95.6 % · 0/6</td>
+<td>95.6 % · 2/6</td>
+<td>95.6 % · 0/6</td>
+<td>6.07 px</td>
+<td>0.55 s</td>
+</tr>
+<tr>
+<td>Fog</td>
+<td>95.6 % · 0/6</td>
+<td>96.3 % · 0/6</td>
+<td>95.6 % · 0/6</td>
+<td>6.07 px</td>
+<td>0.55 s</td>
+</tr>
+<tr>
+<td>Rain</td>
+<td>95.6 % · 0/6</td>
+<td>93.6 % · 1/6</td>
+<td>96.0 % · 0/6</td>
+<td>6.07 px</td>
+<td>0.55 s</td>
+</tr>
+<tr>
+<td>Low light</td>
+<td>95.6 % · 2/6</td>
+<td>96.3 % · 0/6</td>
+<td>96.4 % · 0/6</td>
+<td>6.07 px</td>
+<td>0.55 s</td>
+</tr>
+<tr>
+<td>Heavy sensor noise</td>
+<td>95.9 % · 2/6</td>
+<td>95.8 % · 0/6</td>
+<td>95.9 % · 1/6</td>
+<td>6.06 px</td>
+<td>0.55 s</td>
+</tr>
+<tr>
+<td>Camera jitter</td>
+<td>58.3 % · 0/6</td>
+<td>58.4 % · 0/6</td>
+<td>57.8 % · 0/6</td>
+<td>9.37 px</td>
+<td>0.35 s</td>
+</tr>
+<tr>
+<td>Optical blur + motion smear</td>
+<td>21.5 % · 0/6</td>
+<td>21.7 % · 0/6</td>
+<td>21.5 % · 0/6</td>
+<td>15.10 px</td>
+<td>0.83 s</td>
+</tr>
+<tr>
+<td>Dim beacon (below threshold)</td>
+<td>0.0 % · 0/6</td>
+<td>31.1 % · 4/6</td>
+<td>95.7 % · 2/6</td>
+<td>6.11 px</td>
+<td>1.70 s</td>
+</tr>
+<tr>
+<td>Blinking beacon (reacquisition)</td>
+<td>93.6 % · 0/6</td>
+<td>90.5 % · 2/6</td>
+<td>93.6 % · 0/6</td>
+<td>10.55 px</td>
+<td>1.53 s</td>
+</tr>
+<tr>
+<td>Bright decoys</td>
+<td>0.0 % · 4/6</td>
+<td>2.9 % · 6/6</td>
+<td>96.7 % · 2/6</td>
+<td>17.19 px</td>
+<td>1.38 s</td>
+</tr>
+<tr>
+<td>Bright decoys + noise</td>
+<td>0.0 % · 5/6</td>
+<td>0.3 % · 6/6</td>
+<td>96.8 % · 2/6</td>
+<td>16.94 px</td>
+<td>1.03 s</td>
+</tr>
+<tr>
+<td>Bright decoys + jitter</td>
+<td>0.0 % · 4/6</td>
+<td>1.7 % · 6/6</td>
+<td>60.1 % · 4/6</td>
+<td>114.15 px</td>
+<td>4.67 s</td>
+</tr>
+</tbody></table>
+<p><img src="figures/fig06_correct_lock.png" alt="Correct lock"></p>
+<p class="caption">Figure 7. Median time locked on the true beacon, per condition and detector (MEASURED).</p><h3>27.2 Perception on identical frames (Arm A): precision / recall / false alarms on empty frames</h3>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Classical P / R / FA</th>
+<th>AI only P / R / FA</th>
+<th>Hybrid P / R / FA</th>
+<th>Empty frames</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Clear</td>
+<td>0.950 / 1.000 / 71</td>
+<td>0.375 / 0.961 / 2111</td>
+<td>0.950 / 0.996 / 71</td>
+<td>3150</td>
+</tr>
+<tr>
+<td>Haze</td>
+<td>0.973 / 1.000 / 38</td>
+<td>0.277 / 0.712 / 2120</td>
+<td>0.963 / 0.996 / 51</td>
+<td>3150</td>
+</tr>
+<tr>
+<td>Fog</td>
+<td>0.983 / 1.000 / 23</td>
+<td>0.443 / 0.968 / 1602</td>
+<td>0.969 / 1.000 / 43</td>
+<td>3150</td>
+</tr>
+<tr>
+<td>Rain</td>
+<td>0.962 / 1.000 / 54</td>
+<td>0.308 / 0.866 / 2442</td>
+<td>0.945 / 0.996 / 78</td>
+<td>3150</td>
+</tr>
+<tr>
+<td>Low light</td>
+<td>0.386 / 1.000 / 2145</td>
+<td>0.376 / 0.963 / 2111</td>
+<td>0.913 / 0.996 / 128</td>
+<td>3150</td>
+</tr>
+<tr>
+<td>Heavy sensor noise</td>
+<td>0.358 / 1.000 / 2421</td>
+<td>0.375 / 0.964 / 2122</td>
+<td>0.857 / 0.995 / 224</td>
+<td>3150</td>
+</tr>
+<tr>
+<td>Camera jitter</td>
+<td>0.946 / 1.000 / 77</td>
+<td>0.378 / 0.970 / 2114</td>
+<td>0.917 / 0.995 / 119</td>
+<td>3151</td>
+</tr>
+<tr>
+<td>Optical blur + motion smear</td>
+<td>0.959 / 1.000 / 58</td>
+<td>0.391 / 0.991 / 2105</td>
+<td>0.947 / 0.996 / 76</td>
+<td>3131</td>
+</tr>
+<tr>
+<td>Dim beacon (below threshold)</td>
+<td>0.000 / 0.000 / 0</td>
+<td>0.217 / 0.558 / 2123</td>
+<td>0.910 / 0.641 / 21</td>
+<td>3150</td>
+</tr>
+<tr>
+<td>Blinking beacon (reacquisition)</td>
+<td>0.949 / 1.000 / 61</td>
+<td>0.319 / 0.957 / 2255</td>
+<td>0.948 / 0.996 / 61</td>
+<td>3373</td>
+</tr>
+<tr>
+<td>Bright decoys</td>
+<td>0.235 / 0.989 / 3432</td>
+<td>0.135 / 0.569 / 3432</td>
+<td>0.854 / 1.000 / 183</td>
+<td>3432</td>
+</tr>
+<tr>
+<td>Bright decoys + noise</td>
+<td>0.096 / 0.403 / 3432</td>
+<td>0.084 / 0.353 / 3432</td>
+<td>0.390 / 0.975 / 1598</td>
+<td>3432</td>
+</tr>
+<tr>
+<td>Bright decoys + jitter</td>
+<td>0.236 / 0.991 / 3430</td>
+<td>0.134 / 0.565 / 3430</td>
+<td>0.817 / 0.994 / 232</td>
+<td>3430</td>
+</tr>
+</tbody></table>
+<h3>27.3 Interpretation — complementary strengths, not a universal winner</h3>
+<ul>
+<li><strong>Hybrid clearly better:</strong> bright decoys (~97 % correct lock vs 0 % classical), bright decoys + noise
+(~97 % vs 0 %), dim beacon below threshold (95.7 % vs 0 %), low light (0/6 vs 2/6 diverged; precision
+0.913 vs 0.386 in Arm A), heavy noise (precision 0.857 vs 0.358).</li>
+<li><strong>Equal:</strong> clear, haze, fog, rain, camera jitter, blur + smear, blinking beacon — classical CV was
+already right; the hybrid adds cost, not accuracy.</li>
+<li><strong>Hybrid worse or costly:</strong> ~10× the per-frame cost (§28.4); slower dim-beacon acquisition (1.70 s)
+because AI-only spots must prove themselves over ≥ 10 frames; bright decoys + jitter only partly solved
+(60 %, 4/6 diverged); a few extra false alarms in clear/haze/rain in Arm A.</li>
+<li><strong>No detector does well</strong> under strong jitter (~58 %) or blur + smear (~21 %): those losses are in
+tracking/control against a 10 px lock radius, not in perception.</li>
+<li><strong>AI branch alone should not be used:</strong> ~2,100 false alarms per 3,150 empty frames in every condition.</li>
+</ul>
+<hr>
+<h2>28. AI Model Results</h2>
+<h3>28.1 TinyBeaconNet (patch level, MEASURED, <code>public/models/beacon-roi-v2.json</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Split</th>
+<th>Accuracy</th>
+<th>Precision</th>
+<th>Recall</th>
+<th>F1</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Stage A — real validation</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>0.8891</td>
+</tr>
+<tr>
+<td>Stage A — synthetic validation</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>0.3314</td>
+</tr>
+<tr>
+<td>Stage B — combined validation</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>0.9842</td>
+</tr>
+<tr>
+<td>Final — real validation</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>0.8834</td>
+</tr>
+<tr>
+<td>Final — synthetic validation</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>0.9910</td>
+</tr>
+<tr>
+<td><strong>LOCKED smartphone test</strong> (56 images, different camera)</td>
+<td>0.9577</td>
+<td>0.9558</td>
+<td>0.9619</td>
+<td><strong>0.9589</strong></td>
+</tr>
+<tr>
+<td><strong>LOCKED synthetic stress test</strong></td>
+<td>0.9977</td>
+<td>0.9988</td>
+<td>0.9963</td>
+<td><strong>0.9975</strong></td>
+</tr>
+</tbody></table>
+<p>Patch-level classification of ROIs, threshold 0.5. &quot;—&quot; = not recorded for that split.</p>
+<h3>28.2 Track verifier (track level, MEASURED, <code>public/models/track-verifier-v1.json</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Measure</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Validation F1 / AUC</td>
+<td>0.8793 / 0.9685</td>
+</tr>
+<tr>
+<td>LOCKED test precision / recall / F1</td>
+<td>0.9128 / 0.7253 / 0.8083</td>
+</tr>
+<tr>
+<td>LOCKED test AUC / log-loss</td>
+<td>0.9608 / 0.2573</td>
+</tr>
+<tr>
+<td>LOCKED test, tracks age ≥ 30: F1 / AUC</td>
+<td>0.8194 / 0.9706</td>
+</tr>
+<tr>
+<td>Ablation: without CNN feature — F1 / AUC</td>
+<td>0.7993 / 0.9622</td>
+</tr>
+<tr>
+<td>Ablation: without motion features — F1 / AUC</td>
+<td>0.7990 / 0.9416</td>
+</tr>
+<tr>
+<td>Ablation: CNN feature only — F1 / AUC</td>
+<td>0.0000 / 0.7550</td>
+</tr>
+</tbody></table>
+<p>The &quot;CNN only&quot; model never exceeds 0.5 (F1 0 at the 0.5 threshold); its ranking ability is AUC 0.755. Appearance alone does not separate beacon from decoy tracks; motion does.</p>
+<p><img src="figures/fig09_verifier_calibration.png" alt="Calibration"></p>
+<p class="caption">Figure 8. Verifier calibration on the locked test (MEASURED). Points slightly above the diagonal:
+the model is mildly under-confident.</p><h3>28.3 mAP</h3>
+<p><strong>NOT MEASURED</strong> — the model classifies ROIs; it does not output boxes.</p>
+<h3>28.4 Latency (MEASURED, <code>scripts/bench-latency.ts</code>, bright decoys + noise + jitter)</h3>
+<table>
+<thead>
+<tr>
+<th>Detector</th>
+<th>Perception mean / p95 (ms)</th>
+<th>Pipeline mean / p95 (ms)</th>
+<th>Stage split (ms)</th>
+<th>Pipeline FPS</th>
+<th>30 Hz budget (p95)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Classical</td>
+<td>0.42 / 0.58</td>
+<td>0.45 / 0.65</td>
+<td>—</td>
+<td>2238</td>
+<td>within</td>
+</tr>
+<tr>
+<td>AI only</td>
+<td>4.00 / 6.05</td>
+<td>4.03 / 6.10</td>
+<td>CV 0.00 · AI 3.99 · temporal 0.00 · fusion 0.000</td>
+<td>248</td>
+<td>within</td>
+</tr>
+<tr>
+<td>Hybrid</td>
+<td>4.40 / 6.30</td>
+<td>4.42 / 6.32</td>
+<td>CV 0.45 · AI 3.81 · temporal 0.10 · fusion 0.012</td>
+<td>226</td>
+<td>within</td>
+</tr>
+<tr>
+<td>Mode 1 full-frame</td>
+<td>288</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>over</td>
+</tr>
+</tbody></table>
+<p>12th Gen Intel(R) Core(TM) i3-1215U, 8 threads; runtime onnxruntime-web 1.30.0 (wasm, 1 thread); measured 2026-09-29. Latency on the judge machine: <strong>not measured</strong> — run <code>bun scripts/bench-latency.ts</code> there.</p>
+<p><img src="figures/fig07_latency.png" alt="Latency"></p>
+<p class="caption">Figure 9. Per-frame pipeline time per detector (MEASURED).</p><h3>28.5 Mode 1 vs Mode 2 (Phase 12)</h3>
+<p>MEASURED on the same 120 frames (clear, bright decoys, dim beacon), ONNX Runtime Web for Mode 2:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Latency per frame</th>
+<th>Recall</th>
+<th>Precision</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mode 1 — full-frame CNN</td>
+<td>822.2 ms</td>
+<td>0.793</td>
+<td>0.192</td>
+</tr>
+<tr>
+<td>Mode 2 — proposals + ROI CNN (<code>ai</code>)</td>
+<td>9.92 ms</td>
+<td>0.655</td>
+<td>0.211</td>
+</tr>
+</tbody></table>
+<p>Mode 1 is 83× slower and over the 33.3 ms budget; neither mode alone has acceptable precision on this mix — which is why neither is used alone in the hybrid.</p>
+<hr>
+<h2>29. Tracking Results</h2>
+<h3>29.1 Default scenario (classical)</h3>
+<p><img src="figures/fig05_error_fig8.png" alt="Fig-8 error"></p>
+<p class="caption">Figure 10. PS169-03 Figure-8 / Clear, seed 42, classical (MEASURED): acquisition 0.97 s, mean error 6.36 px, max 31.5 px.</p><h3>29.2 Judge demonstration (MEASURED, <code>bun scripts/judge-demo.ts</code>, seed 20260920, 60 s)</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Measured</th>
+<th>PS gate</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Acquisition time</td>
+<td>1.467 s</td>
+<td>≤ 2 s</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>Average tracking error</td>
+<td>2.508 px</td>
+<td>≤ 10 px</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>Centroiding error</td>
+<td>0.843 px</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Algorithm FPS</td>
+<td>1,201</td>
+<td>≥ 20</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>Target loss</td>
+<td>16.556 %</td>
+<td>&lt; 5 %</td>
+<td><strong>FAIL</strong></td>
+</tr>
+<tr>
+<td>Re-acquisition</td>
+<td>9.567 s</td>
+<td>≤ 1 s</td>
+<td><strong>FAIL</strong></td>
+</tr>
+<tr>
+<td>Mission phases / integrity checks</td>
+<td>13/13, 0 failures</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<p>The demonstration deliberately removes the beacon for 6.97 s; re-acquisition is measured from loss and
+therefore includes the beacon&#39;s absence. The prediction phase lasted 0.93 s, the active search 8.57 s, and
+relock after the beacon&#39;s return took 2.63 s. These two gates are reported as failed, not hidden.</p>
+<hr>
+<h2>30. Failure Analysis</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Failure</th>
+<th>Cause</th>
+<th>Effect</th>
+<th>Mitigation (implemented)</th>
+<th>Remaining limitation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Bright decoys</td>
+<td>decoys overlap the beacon&#39;s size range; beacon may start out of view</td>
+<td>classical/AI lock decoy (0 % correct lock)</td>
+<td>track verifier, established-decoy gate, clutter map, verified switch</td>
+<td>2/6 seeds still exceed 50 px mean (initial decoy period); jitter variant 60 %</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Extreme noise</td>
+<td>false peaks above threshold</td>
+<td>false alarms (classical precision 0.358)</td>
+<td>confidence floor; verifier rejects static clutter</td>
+<td>224 false alarms/3,150 empty frames remain (hybrid)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Fog</td>
+<td>contrast × 0.32</td>
+<td>dimmer beacon</td>
+<td>AI branch has no threshold</td>
+<td>none observed in benchmark</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Rain</td>
+<td>streak candidates</td>
+<td>false candidates</td>
+<td>confidence floor, area/aspect</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Complete target loss</td>
+<td>occlusion longer than prediction</td>
+<td>SEARCH; re-acquisition includes absence</td>
+<td>Kalman coasting, scan from current pointing</td>
+<td>7 s blackout → 9.6 s re-acquisition (§29.2)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Multiple candidates</td>
+<td>several spots</td>
+<td>wrong choice possible</td>
+<td>weighted score, hysteresis</td>
+<td>single-beacon only</td>
+</tr>
+<tr>
+<td>7</td>
+<td>AI false positives</td>
+<td>CNN accepts any bright compact spot</td>
+<td>AI-only detector ~2,100 FA/3,150</td>
+<td>AI never used alone; veto-only in fusion</td>
+<td>AI branch alone unusable</td>
+</tr>
+<tr>
+<td>8</td>
+<td>CV false positives</td>
+<td>threshold crossings</td>
+<td>false locks</td>
+<td>floor, gating, verifier in hybrid</td>
+<td>classical alone vulnerable to decoys</td>
+</tr>
+<tr>
+<td>9</td>
+<td>AI/CV disagreement</td>
+<td>different preferences</td>
+<td>—</td>
+<td>recorded; score decides; provenance logged</td>
+<td>—</td>
+</tr>
+<tr>
+<td>10</td>
+<td>FOV exit</td>
+<td>fast target / slew limit</td>
+<td>loss</td>
+<td>prediction, scan</td>
+<td>bounded by 5 °/s slew</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Motion blur / jitter</td>
+<td>smear, shake</td>
+<td>21 % / 58 % correct lock (all detectors)</td>
+<td>Kalman smoothing, common-mode removal in the track bank</td>
+<td>not solved</td>
+</tr>
+<tr>
+<td>12</td>
+<td>MP4 input</td>
+<td>recorded pixels cannot be re-pointed</td>
+<td>perception-only, classical only</td>
+<td>reference-free metrics when no ground truth</td>
+<td>learned detectors not wired to the MP4 path</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Low light model</td>
+<td>airlight term brightens</td>
+<td>dim decoys cross threshold</td>
+<td>hybrid rejects them</td>
+<td>modelling defect retained</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>31. Safety / False-Lock Design</h2>
+<p>A false lock is the most dangerous failure in a pointing system: the camera confidently follows the
+wrong object, and lock-held metrics can still look good — the PS &quot;target loss&quot; metric reported 0 % on the
+classical decoy runs while correct lock was 0 %. The design therefore assumes any single bright frame can
+lie:</p>
+<ul>
+<li><strong>Confirmation</strong> — 3 consecutive detections before TRACK; jumps &gt; 50 px restart confirmation.</li>
+<li><strong>Gating</strong> — the CNN can veto, never promote; the cold-search floor; temporal gating against the
+Kalman prediction.</li>
+<li><strong>Hysteresis</strong> — a switch &gt; 55 px costs × 0.45 unless track evidence is lopsided.</li>
+<li><strong>Temporal verification</strong> — established static tracks are rejected even where predicted; known
+clutter is remembered.</li>
+<li><strong>Prediction</strong> — short dropouts coast instead of re-searching.</li>
+<li><strong>Safe switching</strong> — a deliberate switch resets the filter and re-confirms rather than blending two
+targets.</li>
+<li><strong>Bounded actuation</strong> — controller saturation, integrator clamp, mount rate/acceleration/travel limits.</li>
+</ul>
+<hr>
+<h2>32. Real-Time Demonstration GUI</h2>
+<p><strong>IMPLEMENTED.</strong> The Laboratory view (Figure 11) shows the camera viewport with ground-truth, detection,
+prediction and centre overlays; tracking state; position and velocity; tracking error in px and degrees;
+pipeline FPS; average error, lock, loss, acquisition and re-acquisition; receiver mount commanded vs
+achieved rates; charts (error, target vs camera, pan/tilt command, lock timeline); an optional 3-D view;
+and the event log. The Perception Chain panel (Figure 12) shows, per frame, the classical result, the AI
+branch (score, ROIs, <strong>inference runtime</strong>, inference time), the decision engine, the temporal verifier
+(track, world speed, P(beacon), clutter points), the final decision with reason, and the control chain
+(Kalman prediction, controller command, mount response).</p>
+<p><img src="figures/fig11_gui_main.png" alt="GUI"></p>
+<p class="caption">Figure 11. Laboratory view during a hybrid run in Chrome (production build).</p><p><img src="figures/fig12_perception_panel.png" alt="Perception panel"></p>
+<p class="caption">Figure 12. Perception Chain panel, same run: inference runtime ONNX RUNTIME WEB.</p><p>Evidence value: every number shown is read from the engine&#39;s per-frame provenance; the browser test
+<code>scripts/browser-e2e.ts</code> asserts 15 checks against what the UI holds (15/15 passed, 2026-10-04).</p>
+<hr>
+<h2>33. Logging and Provenance</h2>
+<table>
+<thead>
+<tr>
+<th>Output</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>events.csv</code> (per frame)</td>
+<td>timestamp, frame_index, source_mode, gt_x, gt_y, detected_x, detected_y, predicted_x, predicted_y, confidence, tracking_state, pan_deg, tilt_deg, pan_command, tilt_command, error_px, processing_ms, locked, lost</td>
+</tr>
+<tr>
+<td><code>metrics.json</code></td>
+<td>all metrics of §23, configuration, PS gate verdicts</td>
+</tr>
+<tr>
+<td><code>summary.html</code></td>
+<td>human-readable performance report</td>
+</tr>
+<tr>
+<td>Event log (UI)</td>
+<td>typed entries (SYSTEM, STATE, DETECT, TRACK, CONTROL, MOUNT, LOSS, REACQUIRE, …); a &quot;Perception chain&quot; and &quot;Kalman → PID → mount&quot; entry once per second</td>
+</tr>
+<tr>
+<td>Detection provenance (per frame)</td>
+<td>CV pick, AI pick, candidate counts, chosen-by rule, rejections, chosen source (<code>cv</code>/<code>ai</code>/<code>both</code>), track ID/age/P/speed, clutter points, <strong>AI runtime</strong>, per-stage latencies, decision reason</td>
+</tr>
+<tr>
+<td>Run registry</td>
+<td>SQLite via Prisma, <code>/api/runs</code></td>
+</tr>
+</tbody></table>
+<p>AI-specific columns are <strong>not</strong> in <code>events.csv</code>; they are in per-frame provenance and the event log.
+Provenance matters because &quot;this was a fusion decision made by ONNX Runtime&quot; is then a checkable fact
+in the run record, not a claim. Appendix F shows real log lines.</p>
+<hr>
+<h2>34. Software Architecture</h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Responsibility</th>
+<th>Inputs → outputs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>src/engine/config.ts</code></td>
+<td>Zod-validated configuration, defaults</td>
+<td>raw config → <code>ScenarioConfig</code></td>
+</tr>
+<tr>
+<td><code>src/engine/scene.ts</code>, <code>trajectories.ts</code></td>
+<td>scene raster, beacon, decoys, blur, smear</td>
+<td>t, config → scene buffer, ground truth</td>
+</tr>
+<tr>
+<td><code>src/engine/camera.ts</code></td>
+<td>crop, disturbances, platform motion</td>
+<td>scene, pose → observed frame</td>
+</tr>
+<tr>
+<td><code>src/engine/detector.ts</code></td>
+<td>classical CV</td>
+<td>frame → <code>Detection</code> / candidates</td>
+</tr>
+<tr>
+<td><code>src/engine/proposer.ts</code></td>
+<td>AI-branch local-contrast proposer</td>
+<td>frame → candidates</td>
+</tr>
+<tr>
+<td><code>src/engine/nn.ts</code></td>
+<td>CNN forward pass, preprocessing, Mode 1, batch interfaces</td>
+<td>crops → scores</td>
+</tr>
+<tr>
+<td><code>src/engine/candidate-tracks.ts</code></td>
+<td>track bank, world motion, clutter map</td>
+<td>candidates, pose → tracks, features</td>
+</tr>
+<tr>
+<td><code>src/engine/track-verifier.ts</code></td>
+<td>verifier forward pass</td>
+<td>features → P(beacon)</td>
+</tr>
+<tr>
+<td><code>src/engine/fusion.ts</code></td>
+<td>decision engine</td>
+<td>candidates, scores, evidence → decision</td>
+</tr>
+<tr>
+<td><code>src/engine/detector-ai.ts</code>, <code>detectors.ts</code></td>
+<td>detector implementations, registry</td>
+<td>frame, context → <code>Detection</code></td>
+</tr>
+<tr>
+<td><code>src/engine/kalman.ts</code>, <code>tracker.ts</code></td>
+<td>estimation, state machine</td>
+<td>detection → <code>TrackState</code></td>
+</tr>
+<tr>
+<td><code>src/engine/pid.ts</code>, <code>mount.ts</code></td>
+<td>control, actuation</td>
+<td>estimate → command → pose</td>
+</tr>
+<tr>
+<td><code>src/engine/pipeline.ts</code>, <code>simulation.ts</code></td>
+<td>one frame, the canonical loop</td>
+<td>config, model → step result</td>
+</tr>
+<tr>
+<td><code>src/engine/metrics.ts</code>, <code>export.ts</code></td>
+<td>scoring, reports</td>
+<td>per frame → <code>RunResult</code>, files</td>
+</tr>
+<tr>
+<td><code>src/engine/mission.ts</code>, <code>link.ts</code>, <code>demo.ts</code></td>
+<td>mission phases/integrity, simulated link model, judge demo</td>
+<td>step results → snapshots</td>
+</tr>
+<tr>
+<td><code>src/workers/simulation.worker.ts</code></td>
+<td>live loop, pacing, ORT loading, telemetry</td>
+<td>messages → frames, logs</td>
+</tr>
+<tr>
+<td><code>src/lib/ort-runtime.ts</code>, <code>load-model.ts</code></td>
+<td>ONNX Runtime Web backends, asset loading</td>
+<td>ONNX bytes → scorers</td>
+</tr>
+<tr>
+<td><code>src/components/**</code></td>
+<td>UI views and panels</td>
+<td>store → rendering</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>35. Technology Stack</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Frontend</td>
+<td>Next.js 16, React 19, TypeScript 5, Tailwind CSS 4, shadcn/ui (Radix), Zustand 5</td>
+</tr>
+<tr>
+<td>Visualisation</td>
+<td>Recharts 2 (charts), three.js 0.186 + React Three Fiber 9 (3-D view)</td>
+</tr>
+<tr>
+<td>Simulation, CV, tracking, control</td>
+<td>pure TypeScript engine (no browser APIs), Web Worker</td>
+</tr>
+<tr>
+<td>AI training</td>
+<td>Python 3.12, PyTorch 2.14.0 (CPU), NumPy, Pillow</td>
+</tr>
+<tr>
+<td>Model export / check</td>
+<td>torch.onnx (TorchScript exporter, opset 17), onnx 1.23, onnxruntime 1.30 (Python)</td>
+</tr>
+<tr>
+<td>Model runtime</td>
+<td>ONNX Runtime Web 1.30.0 (WebAssembly)</td>
+</tr>
+<tr>
+<td>Validation of config</td>
+<td>Zod 4</td>
+</tr>
+<tr>
+<td>Persistence</td>
+<td>Prisma 6 + SQLite (run registry)</td>
+</tr>
+<tr>
+<td>Build / run</td>
+<td>Bun 1.4.2, Next.js standalone server</td>
+</tr>
+<tr>
+<td>Testing</td>
+<td><code>bun test</code> (122 tests, 7 files); puppeteer-core 25 + Chrome for the browser test</td>
+</tr>
+<tr>
+<td>Figures</td>
+<td>matplotlib</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>36. Computational Complexity</h2>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Complexity</th>
+<th>Measured (§28.4)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Classical CV</td>
+<td>O(N_pixels) threshold + labelling</td>
+<td>~0.45 ms</td>
+</tr>
+<tr>
+<td>AI proposer</td>
+<td>O(N_pixels) summed-area table and box means + O(P log P) peak sort</td>
+<td>~3 ms on noisy frames</td>
+</tr>
+<tr>
+<td>CNN</td>
+<td>O(k) crops × ~230 k multiply-accumulates each</td>
+<td>~0.3–0.8 ms per frame in ORT</td>
+</tr>
+<tr>
+<td>Track bank</td>
+<td>O(T·k) association, T tracks, k candidates (≤ 18)</td>
+<td>~0.1 ms</td>
+</tr>
+<tr>
+<td>Kalman</td>
+<td>constant 4 × 4</td>
+<td>negligible</td>
+</tr>
+<tr>
+<td>PID / mount</td>
+<td>O(1)</td>
+<td>negligible</td>
+</tr>
+<tr>
+<td>Mode 1 full-frame CNN</td>
+<td>O(N_pixels) convolutions + dense head per position</td>
+<td>~290–820 ms</td>
+</tr>
+</tbody></table>
+<p>Theoretical complexity alone does not prove real-time behaviour; the measured per-frame times and p95
+values in §28.4 do.</p>
+<hr>
+<h2>37. Security and Reliability</h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Handling (IMPLEMENTED unless stated)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Input validation</td>
+<td>every configuration passes a Zod schema with ranges and cross-field rules</td>
+</tr>
+<tr>
+<td>Model integrity</td>
+<td>weight-count check (CNN) and feature-order/shape check (verifier) refuse mismatched files; SHA-256 recorded in <code>onnx-manifest.json</code> and verified by tests — <strong>not</strong> verified at runtime</td>
+</tr>
+<tr>
+<td>Model missing</td>
+<td>learned detectors refuse to construct; the UI disables them; the worker reports the load error</td>
+</tr>
+<tr>
+<td>ORT failure</td>
+<td>logged warning; labelled fallback to the TypeScript forward pass</td>
+</tr>
+<tr>
+<td>Determinism</td>
+<td>seeded RNG; identical reruns asserted in tests</td>
+</tr>
+<tr>
+<td>Numerical stability</td>
+<td>Kalman skips singular updates; Δt guards in Kalman and PID</td>
+</tr>
+<tr>
+<td>Safe limits</td>
+<td>controller saturation, integrator clamp, mount rate/acceleration/travel limits</td>
+</tr>
+<tr>
+<td>Runtime exceptions</td>
+<td>worker catches step errors, logs them and stops the run</td>
+</tr>
+<tr>
+<td>Invalid frames</td>
+<td>simulator frames are generated internally at a fixed size; robustness of the MP4 path to malformed video was <strong>not verified</strong> in this audit</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>38. Limitations</h2>
+<ul>
+<li><strong>Simulation-to-real gap.</strong> No optical hardware; disturbances are simplified models.</li>
+<li><strong>Training data.</strong> Real data is laser pointers on indoor surfaces, not FSOC beacons; the FSOC domain is
+synthetic.</li>
+<li><strong>Motion assumption.</strong> The verifier learned that the beacon moves; a stationary beacon among equally
+bright, equally sized static decoys is not separable without modulation.</li>
+<li><strong>Camera model.</strong> Planar angular scene; no lens model, no perspective, no 3-D world.</li>
+<li><strong>Atmosphere.</strong> Contrast/brightness model only; no turbulence, scintillation or beam wander;
+<code>low_light</code> brightens the background (defect).</li>
+<li><strong>Single target.</strong> Multiple beacons not implemented.</li>
+<li><strong>MP4 benchmark path.</strong> Perception-only and classical-only; the learned detectors are not wired to
+video input.</li>
+<li><strong>Runtime.</strong> Single-thread WASM; latency measured on one laptop only.</li>
+<li><strong>Weak conditions.</strong> Strong jitter, blur + smear, bright decoys + jitter (§27).</li>
+<li><strong>Executable.</strong> A standalone Node/Bun server, not a single native executable.</li>
+</ul>
+<hr>
+<h2>39. Future Work (none of this exists)</h2>
+<p>Physical camera and pan-tilt integration; real optical beacon with modulation (which would also resolve the
+static-beacon ambiguity); hardware-in-the-loop testing; more FSOC-specific real data and domain
+adaptation; turbulence and scintillation models; wiring the hybrid detector into the MP4 benchmark path;
+multi-target tracking; GPU/WebGPU inference; embedded deployment; fine-alignment hand-over; satellite and
+UAV motion models.</p>
+<hr>
+<h2>40. Reproducibility</h2>
+<pre><code class="language-bash"># 1–2. open the project and install dependencies (Bun 1.x)
+bun install
+bun run db:generate                      # Prisma client for the run registry
+# 3. environment: .env holds DATABASE_URL=file:../db/custom.db (no API keys)
+# 4. models are in public/models/ (rebuild below); ORT WASM is copied automatically
+# 5. start the application
+bun run build &amp;&amp; bun run start           # production, http://localhost:3000  (or: bun run dev)
+# 6–8. in the UI: Scenario → choose; Perception/Tracking/Control → Perception:
+#       Classical CV | Learned AI branch | Hybrid CV + AI + temporal; press Start (Space)
+# 9. logs: Event log panel; export events.csv / metrics.json / summary.html at run end
+# 10. benchmarks
+bun test tests/                          # 122 tests
+bun scripts/batch-test.ts                # PS-169, 14 scenarios × 5 seeds
+bun scripts/judge-demo.ts                # judge demonstration, headless
+bash scripts/eval-resumable.sh           # classical vs AI vs hybrid (ONNX Runtime Web)
+bun scripts/bench-latency.ts             # per-stage latency on this machine
+bun scripts/browser-e2e.ts               # real-browser runtime check (server running)
+# rebuild the models from scratch
+bun scripts/gen-synthetic-dataset.ts &amp;&amp; python scripts/ai/build_roi_dataset.py &amp;&amp; python scripts/ai/train_roi.py
+bun scripts/ai/gen-track-dataset.ts &amp;&amp; python scripts/ai/train_track_verifier.py
+python scripts/ai/export_onnx.py
+# report
+bun scripts/report-timeseries.ts &amp;&amp; python scripts/report-figures.py &amp;&amp; bun scripts/build-report.ts
+</code></pre>
+<p>The real dataset is expected at <code>datasets/train_yolo/</code> and <code>datasets/test_coco/</code> (copies of
+<code>train_yolo_format/</code> and <code>test_comparison_coco_format/</code>).</p>
+<hr>
+<h2>41. Project Directory Structure</h2>
+<pre><code>workspace/
+├── src/
+│   ├── engine/            simulation, CV, AI, fusion, tracking, control, metrics (pure TypeScript)
+│   ├── workers/           simulation.worker.ts — live loop, ORT loading, telemetry
+│   ├── lib/               ort-runtime.ts, load-model.ts, engine-client.ts, store.ts
+│   ├── components/        UI: views, camera viewport, telemetry, perception panel, charts, 3-D
+│   └── app/               Next.js app shell and /api/runs
+├── public/
+│   ├── models/            beacon-roi-v2.{bin,json,onnx}, track-verifier-v1.{json,onnx}, onnx-manifest.json
+│   └── ort/               ONNX Runtime Web WASM (copied at build)
+├── scripts/               benchmarks, demos, evaluation, report builders
+│   └── ai/                dataset building, training, ONNX export
+├── tests/                 unit, integration, anti-cheating, parity, runtime tests
+├── datasets/              (git-ignored) real + synthetic data, ROI and track sets
+├── benchmark-results/     PS-169 runs, detector comparison, browser evidence, latency
+├── docs/                  AI-DETECTOR.md (model card), report/ (this report)
+├── prisma/, db/           run registry
+└── README.md, USER_MANUAL.md, IMPLEMENTATION_STATUS.md
+</code></pre>
+<hr>
+<h2>42. Traceability Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>PS-169 requirement</th>
+<th>Implementation</th>
+<th>Source</th>
+<th>Test</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Configurable virtual environment</td>
+<td>scene, decoys, background</td>
+<td><code>scene.ts</code>, <code>config.ts</code></td>
+<td><code>engine-unit</code> (config, RNG)</td>
+<td>GUI Scenario panel</td>
+</tr>
+<tr>
+<td>One or more moving targets</td>
+<td>1 beacon, 6 motions</td>
+<td><code>trajectories.ts</code></td>
+<td><code>engine-unit</code> (trajectories)</td>
+<td>Fig. 4</td>
+</tr>
+<tr>
+<td>Movable virtual camera</td>
+<td>pose, crop, mount</td>
+<td><code>camera.ts</code>, <code>mount.ts</code></td>
+<td><code>engine-evidence</code> (pose only via mount)</td>
+<td>Fig. 2</td>
+</tr>
+<tr>
+<td>Automatic beacon detection</td>
+<td>classical + AI branch</td>
+<td><code>detector.ts</code>, <code>proposer.ts</code>, <code>nn.ts</code></td>
+<td><code>engine-unit</code>, <code>ai-parity</code>, <code>ai-temporal</code></td>
+<td>§27.2</td>
+</tr>
+<tr>
+<td>Continuous tracking with CV</td>
+<td>Kalman + state machine + fusion</td>
+<td><code>kalman.ts</code>, <code>tracker.ts</code>, <code>fusion.ts</code></td>
+<td><code>engine-integration</code>, <code>ai-runtime</code></td>
+<td>Fig. 3</td>
+</tr>
+<tr>
+<td>Control and reposition camera</td>
+<td>PID + mount</td>
+<td><code>pid.ts</code>, <code>mount.ts</code></td>
+<td><code>engine-unit</code> (PID), <code>ai-runtime</code> chain test</td>
+<td>Fig. 2</td>
+</tr>
+<tr>
+<td>Disturbances</td>
+<td>noise, atmosphere, jitter, platform, blur</td>
+<td><code>camera.ts</code>, <code>scene.ts</code></td>
+<td><code>engine-unit</code> (disturbances), <code>ai-temporal</code> (blur)</td>
+<td>§25</td>
+</tr>
+<tr>
+<td>Real-time display</td>
+<td>Laboratory view, Perception Chain</td>
+<td><code>src/components/**</code></td>
+<td><code>browser-e2e</code> (15 checks)</td>
+<td>Fig. 11–12</td>
+</tr>
+<tr>
+<td>AI-assisted tracking</td>
+<td>hybrid in ONNX Runtime Web</td>
+<td><code>detector-ai.ts</code>, <code>ort-runtime.ts</code></td>
+<td><code>ai-runtime</code>, <code>browser-e2e</code></td>
+<td>§27</td>
+</tr>
+<tr>
+<td>Performance report</td>
+<td>metrics + exports</td>
+<td><code>metrics.ts</code>, <code>export.ts</code></td>
+<td><code>engine-integration</code></td>
+<td>§33</td>
+</tr>
+<tr>
+<td>Acquisition ≤ 2 s</td>
+<td>—</td>
+<td><code>metrics.ts</code></td>
+<td><code>batch-test</code></td>
+<td>§26</td>
+</tr>
+<tr>
+<td>Tracking error ≤ 10 px</td>
+<td>—</td>
+<td><code>metrics.ts</code></td>
+<td><code>batch-test</code></td>
+<td>§26</td>
+</tr>
+<tr>
+<td>Target loss &lt; 5 %</td>
+<td>—</td>
+<td><code>metrics.ts</code></td>
+<td><code>batch-test</code></td>
+<td>§26</td>
+</tr>
+<tr>
+<td>Re-acquisition ≤ 1 s</td>
+<td>—</td>
+<td><code>metrics.ts</code></td>
+<td><code>batch-test</code>, <code>judge-demo</code></td>
+<td>§26, §29.2</td>
+</tr>
+<tr>
+<td>≥ 20 FPS</td>
+<td>—</td>
+<td><code>metrics.ts</code></td>
+<td><code>batch-test</code>, <code>bench-latency</code></td>
+<td>§26, §28.4</td>
+</tr>
+<tr>
+<td>Centroiding-error log</td>
+<td>detector vs truth</td>
+<td><code>metrics.ts</code></td>
+<td><code>batch-test</code></td>
+<td>§26</td>
+</tr>
+<tr>
+<td>MP4 input (Benchmark-2)</td>
+<td>WebCodecs decode → classical pipeline</td>
+<td><code>src/lib/video-benchmark.ts</code>, <code>scripts/mp4-demo.ts</code></td>
+<td>not re-run in this audit (ffmpeg absent)</td>
+<td>§30 row 12</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>43. PS-169 Compliance</h2>
+<table>
+<thead>
+<tr>
+<th>PS-169 requirement</th>
+<th>Implemented</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Screen ≥ 2000 × 2000</td>
+<td>Yes</td>
+<td><code>config.ts</code></td>
+</tr>
+<tr>
+<td>Monochrome FPA</td>
+<td>Yes</td>
+<td>8-bit frames</td>
+</tr>
+<tr>
+<td>640 × 480</td>
+<td>Yes</td>
+<td><code>config.ts</code></td>
+</tr>
+<tr>
+<td>FOV user-defined, 4° × 3°</td>
+<td>Yes</td>
+<td><code>config.ts</code></td>
+</tr>
+<tr>
+<td>≥ 30 Hz</td>
+<td>Yes</td>
+<td>30 Hz loop</td>
+</tr>
+<tr>
+<td>Initial camera at centre</td>
+<td>Yes</td>
+<td><code>createCamera</code></td>
+</tr>
+<tr>
+<td>Beacon spot target</td>
+<td>Yes</td>
+<td><code>scene.ts</code></td>
+</tr>
+<tr>
+<td>1 target / multiple optional</td>
+<td>1 yes; multiple <strong>no</strong></td>
+<td>§38</td>
+</tr>
+<tr>
+<td>Shape user-defined, square default</td>
+<td>Yes (square, circle)</td>
+<td><code>config.ts</code></td>
+</tr>
+<tr>
+<td>Size 5–20, default 10</td>
+<td>Yes</td>
+<td><code>config.ts</code></td>
+</tr>
+<tr>
+<td>Initial location random/user</td>
+<td>Yes</td>
+<td><code>scene.ts</code></td>
+</tr>
+<tr>
+<td>Straight, circular, figure-8, random (+ spiral, sinusoidal)</td>
+<td>Yes</td>
+<td><code>trajectories.ts</code></td>
+</tr>
+<tr>
+<td>Pan/tilt 5–10 °/s, default 5</td>
+<td>Yes</td>
+<td><code>config.ts</code>, <code>mount.ts</code></td>
+</tr>
+<tr>
+<td>Update ≥ 20 Hz</td>
+<td>Yes</td>
+<td>30 Hz</td>
+</tr>
+<tr>
+<td>Acquisition ≤ 2 s</td>
+<td>Yes, 14/14 scenarios</td>
+<td>§26</td>
+</tr>
+<tr>
+<td>Tracking error ≤ 10 px</td>
+<td>Yes, 14/14</td>
+<td>§26</td>
+</tr>
+<tr>
+<td>Target loss &lt; 5 %</td>
+<td>Yes, 14/14 (fails in 7 s blackout demo)</td>
+<td>§26, §29.2</td>
+</tr>
+<tr>
+<td>Re-acquisition ≤ 1 s</td>
+<td>Yes where loss occurs in the 14 scenarios; fails in blackout demo</td>
+<td>§26, §29.2</td>
+</tr>
+<tr>
+<td>≥ 20 FPS</td>
+<td>Yes</td>
+<td>§26, §28.4</td>
+</tr>
+<tr>
+<td>Salt &amp; pepper, Gaussian, Poisson</td>
+<td>Yes</td>
+<td>§9</td>
+</tr>
+<tr>
+<td>Noise σ ≤ 20</td>
+<td>Yes</td>
+<td>§9</td>
+</tr>
+<tr>
+<td>Jitter ±20 px/frame</td>
+<td>Yes</td>
+<td>§9</td>
+</tr>
+<tr>
+<td>Clear, haze, fog, rain, low light</td>
+<td>Yes</td>
+<td>§9</td>
+</tr>
+<tr>
+<td>Platform motion, linear + optional</td>
+<td>Yes</td>
+<td>§9</td>
+</tr>
+<tr>
+<td>AI-assisted detection</td>
+<td>Yes (ONNX Runtime Web)</td>
+<td>§11, §15</td>
+</tr>
+<tr>
+<td>Display performance in real time</td>
+<td>Yes</td>
+<td>§32</td>
+</tr>
+<tr>
+<td>Standalone executable</td>
+<td>Standalone server build</td>
+<td>§38</td>
+</tr>
+<tr>
+<td>Source code, documented</td>
+<td>Yes</td>
+<td>repository</td>
+</tr>
+<tr>
+<td>Technical report</td>
+<td>This document</td>
+<td>—</td>
+</tr>
+<tr>
+<td>User manual</td>
+<td>Yes</td>
+<td><code>USER_MANUAL.md</code></td>
+</tr>
+<tr>
+<td>Automatic performance log</td>
+<td>Yes</td>
+<td>§33</td>
+</tr>
+<tr>
+<td>MP4 input bypassing the PTZ camera</td>
+<td>Yes (perception-only, classical)</td>
+<td>§30 row 12</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>44. Conclusion</h2>
+<p>FSOC-PAT implements the complete coarse-alignment loop that PS-169 describes, in software: a configurable
+scene, a moving beacon, a virtual monochrome camera, a disturbance chain, perception, Kalman tracking,
+angular LOS error, PID control and a bounded virtual mount, with automatic, ground-truth-scored
+performance logging. With classical computer vision it passes all five PS-169 gates in all 14 benchmark
+scenarios (MEASURED). A learned perception stage — a 2,989-parameter CNN trained on real laser-spot data
+and simulator data (F1 0.9589 on a locked, different-camera test set) and a learned track verifier (AUC
+0.961) — runs on the live loop in ONNX Runtime Web in the browser.</p>
+<p>The hybrid was selected because the measurements showed neither stage suffices alone: classical CV is the
+better localiser but false-locks onto bright decoys and cannot see below its threshold; the CNN recognises
+spots but cannot tell a decoy from the beacon; only temporal evidence does. The hybrid holds the true
+beacon ~97 % of the time with bright decoys (classical 0 %), finds a beacon below the classical threshold
+(95.7 % vs 0 %), and equals classical CV elsewhere, at ten times the per-frame cost, with slower dim-beacon
+acquisition and with strong jitter and blur still unsolved for every detector. These are evidence-based
+results on simulated data; the system has not been validated against optical hardware.</p>
+<hr>
+<h2>45. References</h2>
+<p>[1] Department of Space / ISRO, &quot;Development of an AI-Based Virtual Camera Tracking System for Coarse
+Alignment of Mobile Free Space Optical Communication (FSOC) Terminals,&quot; Problem Statement PS-169, Smart
+India Hackathon 2026.</p>
+<p>[2] D. Torielli, &quot;Laser Pointer Spot Annotated RGB Images,&quot; Zenodo, v2, Apr. 2025, doi:
+10.5281/zenodo.15230870.</p>
+<p>[3] D. Torielli, &quot;Laser Pointer Spot Detection Models,&quot; Zenodo, v1, Jan. 2024, doi:
+10.5281/zenodo.10471835 (Faster R-CNN and YOLOv5 laser-spot detectors; not used by this system).</p>
+<p>[4] ADVRHumanoids, &quot;nn_laser_spot_tracking,&quot; GitHub repository. [Online]. Available:
+<a href="https://github.com/ADVRHumanoids/nn_laser_spot_tracking">https://github.com/ADVRHumanoids/nn_laser_spot_tracking</a></p>
+<p>[5] D. Torielli, L. Muratore, and N. Tsagarakis, &quot;An intuitive tele-collaboration interface exploring
+laser-based interaction and behavior trees,&quot; <em>Robotics and Autonomous Systems</em>, vol. 193, 2025, doi:
+10.1016/j.robot.2025.105054.</p>
+<p>[6] D. Torielli <em>et al.</em>, &quot;A Laser-Guided Interaction Interface for Providing Effective Robot Assistance
+to People With Upper Limbs Impairments,&quot; <em>IEEE Robotics and Automation Letters</em>, vol. 9, no. 9, pp.
+7653–7660, 2024, doi: 10.1109/LRA.2024.3430709.</p>
+<p>[7] R. E. Kalman, &quot;A New Approach to Linear Filtering and Prediction Problems,&quot; <em>Journal of Basic
+Engineering</em>, vol. 82, no. 1, pp. 35–45, 1960.</p>
+<p>[8] K. J. Åström and T. Hägglund, <em>PID Controllers: Theory, Design, and Tuning</em>, 2nd ed. Research
+Triangle Park, NC, USA: ISA, 1995.</p>
+<p>[9] Microsoft, &quot;ONNX Runtime Web,&quot; v1.30.0. [Online]. Available: <a href="https://onnxruntime.ai">https://onnxruntime.ai</a></p>
+<p>[10] A. Paszke <em>et al.</em>, &quot;PyTorch: An Imperative Style, High-Performance Deep Learning Library,&quot; in
+<em>Advances in Neural Information Processing Systems 32</em>, 2019.</p>
+<p>[11] H. Kaushal and G. Kaddoum, &quot;Optical Communication in Space: Challenges and Mitigation Techniques,&quot;
+<em>IEEE Communications Surveys &amp; Tutorials</em>, vol. 19, no. 1, pp. 57–96, 2017.</p>
+<p>OpenCV and YOLO are not used by this implementation and are therefore not cited.</p>
+<hr>
+<h2>Appendix A — Configuration Parameters (defaults, <code>src/engine/config.ts</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Parameter</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>seed</code></td>
+<td>42</td>
+<td><code>tracking.lockRadiusPx</code></td>
+<td>10</td>
+</tr>
+<tr>
+<td><code>durationS</code></td>
+<td>60</td>
+<td><code>tracking.acquisitionConfirmFrames</code></td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>scene.width</code></td>
+<td>2000</td>
+<td><code>tracking.candidateDisconfirmFrames</code></td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>scene.height</code></td>
+<td>2000</td>
+<td><code>tracking.lostTimeoutFrames</code></td>
+<td>30</td>
+</tr>
+<tr>
+<td><code>scene.distractorCount</code></td>
+<td>2</td>
+<td><code>tracking.searchPattern</code></td>
+<td>raster</td>
+</tr>
+<tr>
+<td><code>scene.backgroundLevel</code></td>
+<td>18</td>
+<td><code>tracking.searchRateFactor</code></td>
+<td>0.9</td>
+</tr>
+<tr>
+<td><code>scene.distractorIntensityMin</code></td>
+<td>0.36</td>
+<td><code>tracking.countPredictionAsLocked</code></td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>scene.distractorIntensityMax</code></td>
+<td>0.44</td>
+<td><code>tracking.threshold</code></td>
+<td>90</td>
+</tr>
+<tr>
+<td><code>camera.resolutionWidth</code></td>
+<td>640</td>
+<td><code>tracking.minDetectionConfidence</code></td>
+<td>0.5</td>
+</tr>
+<tr>
+<td><code>camera.resolutionHeight</code></td>
+<td>480</td>
+<td><code>tracking.controllerEnabled</code></td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>camera.fovXDeg</code></td>
+<td>4</td>
+<td><code>tracking.detectorEnabled</code></td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>camera.fovYDeg</code></td>
+<td>3</td>
+<td><code>tracking.minAreaPx</code></td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>camera.updateHz</code></td>
+<td>30</td>
+<td><code>tracking.maxAreaPx</code></td>
+<td>1200</td>
+</tr>
+<tr>
+<td><code>camera.maxPanSpeedDegS</code></td>
+<td>5</td>
+<td><code>tracking.kalmanQ</code></td>
+<td>0.6</td>
+</tr>
+<tr>
+<td><code>camera.maxTiltSpeedDegS</code></td>
+<td>5</td>
+<td><code>tracking.kalmanR</code></td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>camera.mountAccelDegS2</code></td>
+<td>40</td>
+<td><code>tracking.kp</code></td>
+<td>2.2</td>
+</tr>
+<tr>
+<td><code>camera.exposureMs</code></td>
+<td>0</td>
+<td><code>tracking.ki</code></td>
+<td>0.25</td>
+</tr>
+<tr>
+<td><code>camera.monochrome</code></td>
+<td>true</td>
+<td><code>tracking.kd</code></td>
+<td>0.35</td>
+</tr>
+<tr>
+<td><code>beacon.count</code></td>
+<td>1</td>
+<td><code>tracking.deadbandDeg</code></td>
+<td>0.02</td>
+</tr>
+<tr>
+<td><code>beacon.shape</code></td>
+<td>square</td>
+<td><code>noise.saltPepperPercent</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>beacon.sizePx</code></td>
+<td>10</td>
+<td><code>noise.gaussianSigma</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>beacon.intensity</code></td>
+<td>1</td>
+<td><code>noise.poissonEnabled</code></td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>beacon.motion</code></td>
+<td>figure8</td>
+<td><code>jitter.enabled</code></td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>beacon.speed</code></td>
+<td>1.2</td>
+<td><code>jitter.maxPxPerFrame</code></td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>beacon.startX</code></td>
+<td>null</td>
+<td><code>atmosphere.mode</code></td>
+<td>clear</td>
+</tr>
+<tr>
+<td><code>beacon.startY</code></td>
+<td>null</td>
+<td><code>atmosphere.contrastFactor</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>beacon.blinkPeriodS</code></td>
+<td>0</td>
+<td><code>atmosphere.brightnessFactor</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>beacon.blurSigmaPx</code></td>
+<td>0</td>
+<td><code>platformMotion.mode</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>tracking.detector</code></td>
+<td>cv_classical</td>
+<td><code>platformMotion.maxPxPerFrame</code></td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>tracking.tracker</code></td>
+<td>kalman_cv</td>
+<td><code>platformMotion.speed</code></td>
+<td>0.4</td>
+</tr>
+<tr>
+<td><code>tracking.controller</code></td>
+<td>pid_angle_space</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>Appendix B — Model Configuration</h2>
+<pre><code class="language-json">{
+  &quot;generatedAt&quot;: &quot;2026-09-28T05:38:36+00:00&quot;,
+  &quot;exporter&quot;: &quot;torch 2.14.0+cpu (TorchScript exporter), opset 17&quot;,
+  &quot;models&quot;: {
+    &quot;beacon-roi-v2&quot;: {
+      &quot;file&quot;: &quot;beacon-roi-v2.onnx&quot;,
+      &quot;sha256&quot;: &quot;1bb8a7ded0f6d9b1bd34b103e383ef66f1be33af3ae000f2f8b623a24e84ffbb&quot;,
+      &quot;bytes&quot;: 14422,
+      &quot;sourceWeights&quot;: &quot;beacon-roi-v2.bin&quot;,
+      &quot;sourceWeightsSha256&quot;: &quot;73f5b53c8826bbc683a887e841ed2bf987fa86c5e44ac2df351a64ce8bc3b151&quot;,
+      &quot;input&quot;: {
+        &quot;name&quot;: &quot;patches&quot;,
+        &quot;dtype&quot;: &quot;float32&quot;,
+        &quot;shape&quot;: [
+          &quot;N&quot;,
+          1,
+          24,
+          24
+        ],
+        &quot;preprocessing&quot;: &quot;crop 24x24 at candidate centroid (edge replication), subtract median of 2-px border ring, /128, clip [-1, 2]&quot;
+      },
+      &quot;output&quot;: {
+        &quot;name&quot;: &quot;p_beacon&quot;,
+        &quot;dtype&quot;: &quot;float32&quot;,
+        &quot;shape&quot;: [
+          &quot;N&quot;,
+          1
+        ],
+        &quot;meaning&quot;: &quot;sigmoid P(ROI contains the beacon)&quot;
+      },
+      &quot;parity&quot;: {
+        &quot;maxAbsVsTorch&quot;: 3.5762786865234375e-7,
+        &quot;maxAbsVsFixture&quot;: 4.172325134277344e-7
+      }
+    },
+    &quot;track-verifier-v1&quot;: {
+      &quot;file&quot;: &quot;track-verifier-v1.onnx&quot;,
+      &quot;sha256&quot;: &quot;c5fd64314968a0b0a5189f9dc02b313076beca9174b3e7221a40e8de729d67ad&quot;,
+      &quot;bytes&quot;: 1196,
+      &quot;sourceWeights&quot;: &quot;track-verifier-v1.json&quot;,
+      &quot;sourceWeightsSha256&quot;: &quot;0c482259b8b4d152be4acb8fa3bbd2ed76a589b0203cad14cc5ec0943b2468a4&quot;,
+      &quot;input&quot;: {
+        &quot;name&quot;: &quot;features&quot;,
+        &quot;dtype&quot;: &quot;float32&quot;,
+        &quot;shape&quot;: [
+          &quot;N&quot;,
+          8
+        ],
+        &quot;features&quot;: [
+          &quot;ai_mean&quot;,
+          &quot;cv_mean&quot;,
+          &quot;size_mean&quot;,
+          &quot;bright_mean&quot;,
+          &quot;speed&quot;,
+          &quot;speed_reliability&quot;,
+          &quot;moving_evidence&quot;,
+          &quot;persistence&quot;
+        ]
+      },
+      &quot;output&quot;: {
+        &quot;name&quot;: &quot;p_beacon&quot;,
+        &quot;dtype&quot;: &quot;float32&quot;,
+        &quot;shape&quot;: [
+          &quot;N&quot;,
+          1
+        ],
+        &quot;meaning&quot;: &quot;sigmoid P(candidate track is the beacon), calibrated&quot;
+      },
+      &quot;parity&quot;: {
+        &quot;maxAbsVsTorch&quot;: 7.450580596923828e-8,
+        &quot;maxAbsVsFixture&quot;: 7.450580596923828e-8
+      }
+    }
+  }
+}
+</code></pre>
+<h2>Appendix C — Dataset Structure</h2>
+<pre><code>datasets/
+├── train_yolo/yolo_format/{train,valid}/{images,labels}   Zenodo D435 (309 / 76 images)
+├── test_coco/{images,annotations/instances_default.json}  Zenodo smartphone (56, LOCKED)
+├── fsoc_synth/{train,valid,test_stress}/{images,labels}   simulator (5,040 / 1,260 / 1,120)
+├── roi/*.npz                                              24×24 patch splits (§12.3)
+└── tracks/{train,valid,test}.csv                           track-verifier samples
+</code></pre>
+<h2>Appendix D — Important APIs</h2>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SimulationRunner.step(dt)</code> / <code>stepAsync(dt)</code></td>
+<td>advance one frame (sync TS / async ORT path)</td>
+</tr>
+<tr>
+<td><code>Pipeline.step(packet)</code> / <code>stepAsync(packet)</code></td>
+<td>perception → tracking → control → metrics</td>
+</tr>
+<tr>
+<td><code>BeaconDetector.detect(...)</code> / <code>detectAsync(...)</code></td>
+<td>one frame of perception; no ground-truth parameter</td>
+</tr>
+<tr>
+<td><code>fuse(candidates, aiScores, context, opts)</code></td>
+<td>decision engine</td>
+</tr>
+<tr>
+<td><code>CandidateTrackBank.update(...)</code></td>
+<td>world-frame candidate tracks</td>
+</tr>
+<tr>
+<td><code>createOrtBackends(cnn, verifier, wasmPaths)</code></td>
+<td>ONNX Runtime Web scorers</td>
+</tr>
+<tr>
+<td><code>MetricsEngine.onFrame(...)</code> / <code>finalize()</code></td>
+<td>scoring and <code>RunResult</code></td>
+</tr>
+<tr>
+<td><code>GET /api/runs</code>, <code>GET /api/runs/[id]</code></td>
+<td>run registry</td>
+</tr>
+</tbody></table>
+<h2>Appendix E — Benchmark Configuration</h2>
+<p>Detector comparison: seeds 4200, 4301, 4402, 4503, 4604, 4705; 25 s per run; hit radius 8 px; divergence 50 px;
+lock radius 10 px. PS-169 benchmark: 14 presets, 5 seeds each, mean gated against acquisition ≤ 2 s,
+error ≤ 10 px, loss &lt; 5 %, re-acquisition ≤ 1 s, ≥ 20 FPS.</p>
+<h2>Appendix F — Example Runtime Logs (real browser run, 2026-10-04)</h2>
+<pre><code>      SYSTEM  Learned model loaded — beacon-roi-v2 — 2989 parameters
+      SYSTEM  ONNX Runtime Web ready — onnxruntime-web 1.30.0 (wasm, 1 thread) — beacon-roi-v2.onnx 14422 B + track-verifier-v1.onnx 1196 B, sessions created in 477 ms
+      SYSTEM  Track verifier loaded — track-verifier-v1 — temporal decoy rejection + clutter map active
+      SYSTEM  Mission initialized — scene 2000×2000, cam 640×480 @ 30Hz, seed 4402
+f   1 SYSTEM  Runtime parity on live frame — ROI (257.5, 268.5): ORT 0.883459 vs TS 0.883459 · |Δ| 5.52e-8
+f  30 DETECT  Perception chain — CV (283.5, 235.5) c=1.00 [3 cand] · AI (439.0, 278.0) p=0.985 [3 ROIs, 0.40 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION track-verified trackP=0.99 → (439.0, 278.0) conf=1.00 · track-verified of 3 (3 CV, 5 AI); 2 rejected
+f  30 TRACK   Kalman → PID → mount — state=TRACK pred=(440.1, 302.1) est=(439.7, 293.2) · cmd pan=1.65 tilt=0.17 °/s · mount actual=1.65/0.17 °/s az=-0.107° el=0.212°
+f  60 DETECT  Perception chain — CV (397.0, 195.0) c=1.00 [4 cand] · AI (397.0, 195.0) p=0.985 [4 ROIs, 0.40 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (397.0, 195.0) conf=1.00 · agreement of 4 (4 CV, 6 AI); 2 rejected
+f  60 TRACK   Kalman → PID → mount — state=TRACK pred=(399.7, 182.6) est=(398.8, 186.8) · cmd pan=1.16 tilt=-0.64 °/s · mount actual=1.16/-0.64 °/s az=1.339° el=-0.513°
+</code></pre>
+<h2>Appendix G — Screenshots</h2>
+<p>Figures 11 and 12 (§32); further screenshots in <code>benchmark-results/browser-e2e/</code>.</p>
+<h2>Appendix H — Glossary</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AUC</td>
+<td>area under the ROC curve; probability a random positive outranks a random negative</td>
+</tr>
+<tr>
+<td>Boresight</td>
+<td>the camera&#39;s optical axis, i.e. the image centre</td>
+</tr>
+<tr>
+<td>Calibration</td>
+<td>agreement between predicted probability and observed frequency</td>
+</tr>
+<tr>
+<td>Centroid</td>
+<td>intensity-weighted centre of a blob</td>
+</tr>
+<tr>
+<td>Clutter map</td>
+<td>remembered world positions of rejected static objects</td>
+</tr>
+<tr>
+<td>F1</td>
+<td>harmonic mean of precision and recall</td>
+</tr>
+<tr>
+<td>FOV</td>
+<td>field of view</td>
+</tr>
+<tr>
+<td>Hysteresis</td>
+<td>requiring more evidence to change a decision than to keep it</td>
+</tr>
+<tr>
+<td>Kalman filter</td>
+<td>recursive estimator combining a motion model with noisy measurements</td>
+</tr>
+<tr>
+<td>LOS</td>
+<td>line of sight</td>
+</tr>
+<tr>
+<td>ONNX</td>
+<td>open neural-network model format</td>
+</tr>
+<tr>
+<td>PID</td>
+<td>proportional-integral-derivative controller</td>
+</tr>
+<tr>
+<td>ROI</td>
+<td>region of interest — the 24 × 24 crop around a candidate</td>
+</tr>
+<tr>
+<td>WASM</td>
+<td>WebAssembly, the browser&#39;s portable binary execution format</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Final Summary for the Evaluation Committee</h2>
+<p><strong>A. Architecture</strong> — Figure A (§5): simulation → camera → disturbances → classical CV ∥ AI branch →
+track bank → track verifier → decision engine → Kalman → LOS → PID → mount → next frame; ground truth to
+metrics only.</p>
+<p><strong>B. Technology stack</strong> — §35.</p>
+<p><strong>C. Model specification</strong> — §11; CNN <code>beacon-roi-v2</code> 2,989 parameters, track verifier <code>track-verifier-v1</code>
+121 parameters; ONNX opset 17; ONNX Runtime Web 1.30.0, WASM, CPU.</p>
+<p><strong>D. Dataset specification</strong> — §12; Zenodo 385 + 56 images [2]; 7,420 synthetic images; locked smartphone
+and stress tests.</p>
+<p><strong>E. Benchmark</strong> — §26 (PS-169 gates, 14/14), §27 (classical vs AI vs hybrid), §28 (AI metrics, latency).</p>
+<p><strong>F. Compliance</strong> — §43.</p>
+<p><strong>G. Limitations</strong> — §38.</p>
+<p><strong>H. Reproducibility</strong> — §40.</p>
+<p><strong>I. References</strong> — §45.</p>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  window.__ready = (async () => {
+    renderMathInElement(document.body, { delimiters: [{left: '\\[', right: '\\]', display: true}, {left: '\\(', right: '\\)', display: false}], throwOnError: false });
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral', flowchart: { useMaxWidth: true } });
+    await mermaid.run({ querySelector: '.mermaid' });
+    return true;
+  })();
+</script>
+</body></html>

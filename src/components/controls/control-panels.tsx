@@ -6,8 +6,11 @@
  * sliders. Fields lock during a run (docs/03 §3). Validation errors surface
  * inline on the offending field (docs/03 §7).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { modelManifest, verifierAvailable } from '@/lib/load-model';
+import type { ModelManifest } from '@/engine/nn';
+import type { DetectorKind } from '@/engine/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -156,7 +159,20 @@ export function ControlPanels() {
       </Section>
 
       <Section title="Beacon">
-        <NumField label="Size" official hint="PS default 10×10 px" value={config.beacon.sizePx} onChange={(v) => patch((c) => { c.beacon.sizePx = Math.floor(v); })} unit="px" disabled={d} error={errFor('sizePx')} />
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-[11px] text-fsoc-text2 font-normal">Shape</Label>
+          <Select value={config.beacon.shape} onValueChange={(v) => patch((c) => { c.beacon.shape = v as ScenarioConfig['beacon']['shape']; })} disabled={d}>
+            <SelectTrigger className="h-7 w-[128px] text-[11px] bg-fsoc-bg0 border-fsoc-border1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-fsoc-bg2 border-fsoc-border2 text-[11px]">
+              {(['square', 'circle'] as const).map((sh) => (
+                <SelectItem key={sh} value={sh}>{sh === 'square' ? 'Square' : 'Circle'}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <NumField label="Size" official hint="PS row 10: 5–20 px, default 10×10" value={config.beacon.sizePx} onChange={(v) => patch((c) => { c.beacon.sizePx = Math.floor(v); })} min={5} max={20} unit="px" disabled={d} error={errFor('sizePx')} />
         <NumField label="Intensity" value={config.beacon.intensity} onChange={(v) => patch((c) => { c.beacon.intensity = v; })} step={0.05} min={0.2} max={1} disabled={d} />
         <NumField label="Speed" hint="Trajectory speed multiplier" value={config.beacon.speed} onChange={(v) => patch((c) => { c.beacon.speed = v; })} step={0.1} disabled={d} />
         <NumField label="Blink period" hint="Beacon disappears briefly every N s (loss demo). 0 = never" value={config.beacon.blinkPeriodS} onChange={(v) => patch((c) => { c.beacon.blinkPeriodS = v; })} step={1} min={0} unit="s" disabled={d} />
@@ -165,6 +181,8 @@ export function ControlPanels() {
       <Section title="Disturbance" defaultOpen={false}>
         <NumField label="Salt & pepper" official hint="PS suggests 10% option" value={config.noise.saltPepperPercent} onChange={(v) => patch((c) => { c.noise.saltPepperPercent = v; })} unit="%" disabled={d} />
         <NumField label="Gaussian σ" official hint="PS max std-dev 20" value={config.noise.gaussianSigma} onChange={(v) => patch((c) => { c.noise.gaussianSigma = v; })} unit="" disabled={d} />
+        <NumField label="Optical blur" hint="PSF Gaussian σ applied to every spot (defocus / turbulence). 0 = ideal optics" value={config.beacon.blurSigmaPx ?? 0} onChange={(v) => patch((c) => { c.beacon.blurSigmaPx = v; })} step={0.25} min={0} max={4} unit="px" disabled={d} />
+        <NumField label="Exposure" hint="Sensor exposure time — motion during it smears the beacon and, while slewing, the whole scene. 0 = no motion blur" value={config.camera.exposureMs ?? 0} onChange={(v) => patch((c) => { c.camera.exposureMs = v; })} step={1} min={0} max={33} unit="ms" disabled={d} />
         <div className="flex items-center justify-between">
           <Label className="text-[11px] text-fsoc-text2 font-normal">Poisson</Label>
           <Switch checked={config.noise.poissonEnabled} onCheckedChange={(v) => patch((c) => { c.noise.poissonEnabled = v; })} disabled={d} />
@@ -227,6 +245,8 @@ export function ControlPanels() {
         <NumField label="Ki" value={config.tracking.ki} onChange={(v) => patch((c) => { c.tracking.ki = v; })} step={0.05} disabled={d} />
         <NumField label="Kd" value={config.tracking.kd} onChange={(v) => patch((c) => { c.tracking.kd = v; })} step={0.05} disabled={d} />
         <NumField label="Deadband" value={config.tracking.deadbandDeg} onChange={(v) => patch((c) => { c.tracking.deadbandDeg = v; })} step={0.01} unit="°" disabled={d} />
+        <div className="h-px bg-fsoc-border1" />
+        <DetectorSelect disabled={d} />
         <div className="flex items-center justify-between gap-2">
           <Label className="text-[11px] text-fsoc-text2 font-normal">Search pattern</Label>
           <Select value={config.tracking.searchPattern} onValueChange={(v) => patch((c) => { c.tracking.searchPattern = v as 'raster' | 'spiral'; })} disabled={d}>
@@ -262,6 +282,74 @@ export function ControlPanels() {
           {searchLabel(config.tracking.searchPattern)} scan is used while SEARCH has no candidate.
         </p>
       </Section>
+    </div>
+  );
+}
+
+/**
+ * Perception-path selector (AI plan Phase 11).
+ *
+ * The learned options are DISABLED when no weights file is deployed, rather
+ * than offered and then failing at run start — and the panel says why. There
+ * is no configuration in which the UI claims a learned detector while the
+ * classical one runs.
+ */
+function DetectorSelect({ disabled }: { disabled: boolean }) {
+  const config = useFsoc((s) => s.config);
+  const setConfig = useFsoc((s) => s.setConfig);
+  const [manifest, setManifest] = useState<ModelManifest | null>(null);
+  const [hasVerifier, setHasVerifier] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([modelManifest(), verifierAvailable()]).then(([m, v]) => {
+      if (!alive) return;
+      setManifest(m);
+      setHasVerifier(v);
+      setChecked(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const hasModel = manifest !== null;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-[11px] text-fsoc-text2 font-normal">Perception</Label>
+        <Select
+          value={config.tracking.detector}
+          onValueChange={(v) => {
+            const draft = structuredClone(config);
+            draft.tracking.detector = v as DetectorKind;
+            setConfig(draft);
+          }}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-7 w-[168px] text-[11px] bg-fsoc-bg0 border-fsoc-border1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-fsoc-bg2 border-fsoc-border2 text-[11px]">
+            <SelectItem value="cv_classical">Classical CV</SelectItem>
+            <SelectItem value="ai" disabled={!hasModel}>
+              Learned AI branch
+            </SelectItem>
+            <SelectItem value="fusion" disabled={!hasModel || !hasVerifier}>
+              Hybrid CV + AI + temporal
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="text-[10px] text-fsoc-text3 leading-relaxed">
+        {!checked
+          ? 'Checking for a trained model…'
+          : hasModel
+            ? `Model ${manifest.name}: ${manifest.paramCount} parameters, locked-test F1 ${manifest.metrics.locked_test_f1}.${hasVerifier ? ' Track verifier deployed.' : ' Track verifier missing — hybrid unavailable.'} Tracker, controller and metrics are identical for all three, so switching changes perception only. (Full-frame Mode 1 is benchmark-only: it exceeds the 33 ms frame budget.)`
+            : 'No trained model is deployed, so only classical CV is available. Build one with scripts/ai/build_roi_dataset.py then scripts/ai/train_roi.py.'}
+      </p>
     </div>
   );
 }

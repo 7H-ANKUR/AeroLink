@@ -148,6 +148,35 @@ export function ReplayView() {
     };
   }, [rows]);
 
+  // Error trace path and state bands, both derived from the SAME parsed rows
+  // that drive the scene view — one timeline, several views of it.
+  const errorPath = useMemo(() => {
+    if (rows.length < 2) return '';
+    const errs = rows.map((r) => r.error_px ?? 0);
+    const max = Math.max(1, ...errs);
+    return errs
+      .map((e, i) => `${i === 0 ? 'M' : 'L'}${((i / (rows.length - 1)) * 600).toFixed(1)},${(72 - (e / max) * 66).toFixed(1)}`)
+      .join(' ');
+  }, [rows]);
+
+  const stateBands = useMemo(() => {
+    const bands: { state: string; t0: number; t1: number; pct: number }[] = [];
+    if (rows.length === 0) return bands;
+    let start = 0;
+    for (let i = 1; i <= rows.length; i++) {
+      if (i === rows.length || rows[i].tracking_state !== rows[start].tracking_state) {
+        bands.push({
+          state: rows[start].tracking_state,
+          t0: rows[start].timestamp,
+          t1: rows[i - 1].timestamp,
+          pct: ((i - start) / rows.length) * 100,
+        });
+        start = i;
+      }
+    }
+    return bands;
+  }, [rows]);
+
   // map scene coords to canvas — replay renders in scene space around the track
   const W = 640;
   const H = 480;
@@ -201,7 +230,7 @@ export function ReplayView() {
                   frame {row?.frame_index ?? '—'} / {rows.length - 1}
                 </span>
               </div>
-              <div className="relative bg-[#05070a] aspect-video">
+              <div className="relative bg-[var(--sensor-void)] aspect-video">
                 <canvas
                   id="replay-canvas"
                   width={W}
@@ -245,7 +274,7 @@ export function ReplayView() {
                     // detected
                     const det = toCanvas(row.detected_x, row.detected_y);
                     if (det) {
-                      ctx.strokeStyle = '#72d9e8';
+                      ctx.strokeStyle = '#f2682a';
                       ctx.strokeRect(det[0] - 8, det[1] - 8, 16, 16);
                       ctx.fillStyle = '#fff7d8';
                       ctx.fillRect(det[0] - 1.5, det[1] - 1.5, 3, 3);
@@ -289,11 +318,92 @@ export function ReplayView() {
                     setPlaying(false);
                     setCursor(parseInt(e.target.value));
                   }}
-                  className="flex-1 accent-[#72d9e8] h-1"
+                  className="flex-1 accent-[#ce4710] h-1"
                 />
                 <span className="text-[10px] tnum text-fsoc-text3 w-14 text-right">
                   {row ? `t=${row.timestamp.toFixed(1)}s` : '—'}
                 </span>
+              </div>
+            </div>
+
+            {/* ── channels synchronised to the SAME cursor (§31) ──────────
+                 Everything below reads row `cursor` of the stored per-frame
+                 timeline, so the mount schematic, the error graph and the
+                 state strip cannot drift out of step with the scene view. */}
+            <div className="panel p-3 space-y-3">
+              <div className="panel-title">Synchronised channels</div>
+
+              {/* receiver mount at this frame */}
+              <div className="flex items-center gap-4">
+                <svg width="104" height="104" viewBox="0 0 104 104" aria-label="Receiver mount orientation at this frame">
+                  <circle cx="52" cy="52" r="44" fill="none" stroke="var(--border-1)" strokeWidth="1" />
+                  <circle cx="52" cy="52" r="28" fill="none" stroke="var(--border-1)" strokeWidth="1" strokeDasharray="3 4" />
+                  <path d="M52 8v8M52 88v8M8 52h8M88 52h8" stroke="var(--border-2)" strokeWidth="1" />
+                  {row && (
+                    <g>
+                      {/* boresight direction from the stored mount pose */}
+                      <line
+                        x1="52"
+                        y1="52"
+                        x2={52 + Math.sin((row.pan_deg * Math.PI) / 180) * 40}
+                        y2={52 - Math.sin((row.tilt_deg * Math.PI) / 180) * 40}
+                        stroke="var(--accent-cyan)"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                      />
+                      <circle
+                        cx={52 + Math.sin((row.pan_deg * Math.PI) / 180) * 40}
+                        cy={52 - Math.sin((row.tilt_deg * Math.PI) / 180) * 40}
+                        r="3.5"
+                        fill="var(--accent-cyan)"
+                      />
+                    </g>
+                  )}
+                  <circle cx="52" cy="52" r="3" fill="var(--text-3)" />
+                </svg>
+                <div className="flex-1 min-w-0 grid grid-cols-2 gap-x-4 gap-y-1">
+                  <Row label="Azimuth" value={row ? `${row.pan_deg.toFixed(3)}°` : '—'} />
+                  <Row label="Elevation" value={row ? `${row.tilt_deg.toFixed(3)}°` : '—'} />
+                  <Row label="Pan cmd" value={row ? `${row.pan_command.toFixed(2)} °/s` : '—'} />
+                  <Row label="Tilt cmd" value={row ? `${row.tilt_command.toFixed(2)} °/s` : '—'} />
+                  <Row label="State" value={row ? row.tracking_state : '—'} />
+                  <Row label="Error" value={row && row.error_px !== null ? `${row.error_px.toFixed(2)} px` : '—'} />
+                </div>
+              </div>
+
+              {/* error trace with the cursor marked */}
+              <div>
+                <div className="text-[9px] tracking-[0.14em] text-fsoc-text3 font-semibold mb-1">
+                  TRACKING ERROR (px) — cursor marked
+                </div>
+                <svg viewBox="0 0 600 90" preserveAspectRatio="none" className="w-full h-[70px]" aria-label="Tracking error over the run">
+                  <line x1="0" y1="72" x2="600" y2="72" stroke="var(--border-1)" strokeWidth="1" />
+                  {errorPath && <path d={errorPath} fill="none" stroke="var(--accent-cyan)" strokeWidth="1.6" />}
+                  {rows.length > 1 && (
+                    <line
+                      x1={(cursor / (rows.length - 1)) * 600}
+                      y1="0"
+                      x2={(cursor / (rows.length - 1)) * 600}
+                      y2="90"
+                      stroke="var(--warning)"
+                      strokeWidth="1.5"
+                    />
+                  )}
+                </svg>
+              </div>
+
+              {/* state timeline: every stored frame, coloured by tracking state */}
+              <div>
+                <div className="text-[9px] tracking-[0.14em] text-fsoc-text3 font-semibold mb-1">STATE TIMELINE</div>
+                <div className="flex h-3 rounded overflow-hidden border border-fsoc-border1">
+                  {stateBands.map((b, i) => (
+                    <div
+                      key={i}
+                      title={`${b.state} — t=${b.t0.toFixed(1)}s to ${b.t1.toFixed(1)}s`}
+                      style={{ width: `${b.pct}%`, background: STATE_COLORS[b.state] ?? 'var(--border-2)' }}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -332,6 +442,17 @@ function KV({ k, v, vColor }: { k: string; v: string; vColor?: string }) {
     <div className="flex items-center justify-between">
       <span className="text-fsoc-text2">{k}</span>
       <span style={{ color: vColor ?? 'var(--text-1)' }}>{v}</span>
+    </div>
+  );
+}
+
+
+/** Compact label/value pair used by the synchronised channel panel. */
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[10.5px] text-fsoc-text2">{label}</span>
+      <span className="tnum text-[10.5px] text-fsoc-text1">{value}</span>
     </div>
   );
 }

@@ -108,7 +108,7 @@ export function ScenariosView() {
                     <Check className="w-3 h-3" /> ARM IN MISSION CONTROL
                   </button>
                   <button
-                    className="h-7 px-3 rounded-md text-[10px] tracking-[0.1em] text-[#06272c] bg-fsoc-cyan hover:bg-fsoc-cyan/85 transition-colors inline-flex items-center gap-1.5 disabled:opacity-40"
+                    className="h-7 px-3 rounded-md text-[10px] tracking-[0.1em] text-white bg-fsoc-cyan hover:bg-fsoc-cyan/85 transition-colors inline-flex items-center gap-1.5 disabled:opacity-40"
                     onClick={(e) => {
                       e.stopPropagation();
                       armScenario(p.id);

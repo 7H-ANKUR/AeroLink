@@ -76,18 +76,18 @@ export function summaryHtml(result: RunResult): string {
 <meta charset="utf-8"/>
 <title>FSOC-PAT Run Report — ${result.run_id}</title>
 <style>
-  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0d10; color: #e8edf1; margin: 32px auto; max-width: 860px; padding: 0 24px; }
-  h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.4px; }
-  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1.2px; color: #7d8994; border-bottom: 1px solid #252c33; padding-bottom: 6px; margin-top: 32px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
-  td, th { border-bottom: 1px solid #1c232a; padding: 8px 10px; text-align: left; }
-  th { color: #7d8994; font-weight: 500; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #fbf4ee; color: #16161a; margin: 32px auto; max-width: 860px; padding: 0 24px; }
+  h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.4px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; color: #6b6775; border-bottom: 1px solid #e5d8ca; padding-bottom: 6px; margin-top: 32px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; background: #ffffff; border-radius: 12px; overflow: hidden; }
+  td, th { border-bottom: 1px solid #f1e6dc; padding: 9px 12px; text-align: left; }
+  th { color: #6b6775; font-weight: 600; }
   td.v { font-family: 'Cascadia Mono', Consolas, monospace; font-variant-numeric: tabular-nums; }
-  .pass { color: #79c99b; font-weight: 600; }
-  .fail { color: #d87575; font-weight: 600; }
-  .na, .muted { color: #58636d; }
-  .meta { color: #7d8994; font-size: 12px; }
-  .tag { display:inline-block; border:1px solid #313a43; border-radius:4px; padding:2px 8px; font-size:11px; color:#c3ccd4; margin-right:6px; }
+  .pass { color: #2e7d4f; font-weight: 700; }
+  .fail { color: #b02d22; font-weight: 700; }
+  .na, .muted { color: #78737f; }
+  .meta { color: #6b6775; font-size: 12px; }
+  .tag { display:inline-block; background:#ffffff; border:1px solid #f1e6dc; border-radius:999px; padding:3px 10px; font-size:11px; color:#3a3742; margin-right:6px; }
 </style>
 </head>
 <body>
@@ -108,7 +108,11 @@ export function summaryHtml(result: RunResult): string {
   <tr><th>Metric</th><th>Value</th></tr>
   <tr><td>Duration</td><td class="v">${fmt(result.duration_s, ' s')}</td></tr>
   <tr><td>Acquisition time</td><td class="v">${fmt(result.acquisition_time_s, ' s', 3)}</td></tr>
-  <tr><td>Average tracking error (centroiding)</td><td class="v">${fmt(result.avg_error_px, ' px', 3)}</td></tr>
+  <tr><td>Average tracking error (track estimate vs GT, all frames)</td><td class="v">${fmt(result.avg_error_px, ' px', 3)}</td></tr>
+  <tr><td>&nbsp;&nbsp;&#8627; tracking phase only (excl. search/slew)</td><td class="v">${fmt(result.tracking_phase_error_avg_px, ' px', 3)} (${result.tracking_phase_frames} frames)</td></tr>
+  <tr><td><b>Centroiding error</b> (detector centroid vs GT)</td><td class="v"><b>${fmt(result.centroid_error_avg_px, ' px', 3)}</b></td></tr>
+  <tr><td>&nbsp;&nbsp;&#8627; max / RMSE / samples</td><td class="v">${fmt(result.centroid_error_max_px, ' px', 3)} / ${fmt(result.centroid_error_rmse_px, ' px', 3)} / ${result.centroid_error_samples}</td></tr>
+  <tr><td>False-positive detections (beacon off-frame)</td><td class="v">${result.false_positive_frames} frames</td></tr>
   <tr><td>Max tracking error</td><td class="v">${fmt(result.max_error_px, ' px', 2)}</td></tr>
   <tr><td>RMSE</td><td class="v">${fmt(result.rmse_px, ' px', 3)}</td></tr>
   <tr><td>p95 / p99 error</td><td class="v">${fmt(result.p95_error_px, ' px')} / ${fmt(result.p99_error_px, ' px')}</td></tr>

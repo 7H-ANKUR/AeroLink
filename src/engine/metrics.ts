@@ -51,6 +51,28 @@ export class MetricsEngine {
   private errorSqSum = 0;
   private maxError = 0;
   private errors: number[] = [];
+  // Centroiding error = |detector centroid - ground truth| (docs/08; the PS
+  // Benchmark stages grade "Centroiding error" specifically). This is the RAW
+  // DETECTOR output, deliberately NOT the Kalman-filtered track estimate that
+  // avg_error_px measures.
+  private centroidErrorSum = 0;
+  private centroidErrorSqSum = 0;
+  private centroidErrorMax = 0;
+  private centroidErrorCount = 0;
+  /** Detections returned while the beacon was NOT inside the sensor frame —
+   *  i.e. the detector locked onto something that is not the target. These are
+   *  false positives, counted separately instead of being averaged into the
+   *  centroiding error (a 700 px "centroid error" in a 640x480 frame is not an
+   *  accuracy measurement, it is a mis-detection). */
+  private falsePositiveFrames = 0;
+  /** Error accumulated ONLY over frames where the system was actually tracking
+   *  (TRACK / PREDICT_REACQUIRE). The PS grades Acquisition Time separately, so
+   *  this isolates steady-state pointing accuracy from the search/slew phase.
+   *  Reported alongside — NOT instead of — the all-frames avg_error_px, which
+   *  remains what pass_fail gates on. */
+  private trackPhaseErrorSum = 0;
+  private trackPhaseErrorSqSum = 0;
+  private trackPhaseErrorCount = 0;
   private gtFrames = 0;
   private detectedFrames = 0;
   private confidenceSum = 0;
@@ -96,6 +118,7 @@ export class MetricsEngine {
     detectorLatencyMs: number,
     cameraPose: { pan_deg: number; tilt_deg: number },
     detectedXY: [number | null, number | null],
+    predictedXY: [number | null, number | null] = [null, null],
   ): void {
     this.framesProcessed++;
     this.algorithmElapsedMs += processingMs;
@@ -130,6 +153,25 @@ export class MetricsEngine {
       if (locked) this.lockedFrames++;
     }
 
+    // Centroiding error: raw detector centroid vs ground truth. Only meaningful
+    // when the beacon is actually inside the sensor frame — ground_truth is
+    // image-space and may legitimately fall outside it during search/slew.
+    if (ground_truth && detectionFound && detectedXY[0] !== null && detectedXY[1] !== null) {
+      const w = this.config.camera.resolutionWidth;
+      const h = this.config.camera.resolutionHeight;
+      const beaconInFrame =
+        ground_truth[0] >= 0 && ground_truth[0] < w && ground_truth[1] >= 0 && ground_truth[1] < h;
+      if (beaconInFrame) {
+        const ce = Math.hypot(detectedXY[0] - ground_truth[0], detectedXY[1] - ground_truth[1]);
+        this.centroidErrorSum += ce;
+        this.centroidErrorSqSum += ce * ce;
+        if (ce > this.centroidErrorMax) this.centroidErrorMax = ce;
+        this.centroidErrorCount++;
+      } else {
+        this.falsePositiveFrames++;
+      }
+    }
+
     // error vs ground truth (only where GT exists)
     let errorPx: number | null = null;
     if (ground_truth && trackState.x !== null && trackState.y !== null) {
@@ -139,6 +181,11 @@ export class MetricsEngine {
       if (errorPx > this.maxError) this.maxError = errorPx;
       this.errors.push(errorPx);
       this.gtFrames++;
+      if (eligible) {
+        this.trackPhaseErrorSum += errorPx;
+        this.trackPhaseErrorSqSum += errorPx * errorPx;
+        this.trackPhaseErrorCount++;
+      }
     }
 
     // track continuity streak (reference-free metric, docs/08 §4)
@@ -163,8 +210,8 @@ export class MetricsEngine {
       gt_y: ground_truth ? round3(ground_truth[1]) : null,
       detected_x: detectedXY[0] !== null ? round3(detectedXY[0]) : null,
       detected_y: detectedXY[1] !== null ? round3(detectedXY[1]) : null,
-      predicted_x: null,
-      predicted_y: null,
+      predicted_x: predictedXY[0] !== null ? round3(predictedXY[0]) : null,
+      predicted_y: predictedXY[1] !== null ? round3(predictedXY[1]) : null,
       confidence: round3(detectionConfidence),
       tracking_state: trackState.state,
       pan_deg: round3(cameraPose.pan_deg),
@@ -264,7 +311,19 @@ export class MetricsEngine {
       rmse_px: snap.rmsePx !== null ? round3(snap.rmsePx) : null,
       p95_error_px: p95 !== null ? round3(p95) : null,
       p99_error_px: p99 !== null ? round3(p99) : null,
-      centroid_error_avg_px: snap.avgErrorPx !== null ? round3(snap.avgErrorPx) : null,
+      centroid_error_avg_px: this.centroidErrorCount > 0 ? round3(this.centroidErrorSum / this.centroidErrorCount) : null,
+      centroid_error_max_px: this.centroidErrorCount > 0 ? round3(this.centroidErrorMax) : null,
+      centroid_error_rmse_px:
+        this.centroidErrorCount > 0 ? round3(Math.sqrt(this.centroidErrorSqSum / this.centroidErrorCount)) : null,
+      centroid_error_samples: this.centroidErrorCount,
+      false_positive_frames: this.falsePositiveFrames,
+      tracking_phase_error_avg_px:
+        this.trackPhaseErrorCount > 0 ? round3(this.trackPhaseErrorSum / this.trackPhaseErrorCount) : null,
+      tracking_phase_error_rmse_px:
+        this.trackPhaseErrorCount > 0
+          ? round3(Math.sqrt(this.trackPhaseErrorSqSum / this.trackPhaseErrorCount))
+          : null,
+      tracking_phase_frames: this.trackPhaseErrorCount,
       target_loss_percent: snap.lossPercent !== null ? round3(snap.lossPercent) : null,
       lock_retention_percent: snap.lockRetentionPercent !== null ? round2(snap.lockRetentionPercent) : null,
       lock_policy_counts_prediction: this.config.tracking.countPredictionAsLocked,

@@ -14,6 +14,7 @@ import { CameraViewport } from '@/components/camera/camera-viewport';
 import { Scene3D } from '@/components/scene/scene-3d';
 import { ControlChart, ErrorChart, LockTimeline, TrajectoryChart } from '@/components/charts/charts';
 import { EventLog } from '@/components/logs/event-log';
+import { MissionPhaseStrip } from '@/components/mission/mission-panels';
 import { useFsoc } from '@/lib/store';
 
 type WorkspaceMode = 'camera' | '3d' | 'split';
@@ -34,6 +35,7 @@ export function LaboratoryView() {
 
       {/* CENTER — workspace */}
       <main className="min-h-0 flex flex-col gap-2.5 overflow-y-auto">
+        <MissionPhaseStrip />
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 panel px-1 py-1">
             <WorkspaceTab active={mode === 'camera'} onClick={() => setMode('camera')} icon={ScanLine} label="CAM-01" />

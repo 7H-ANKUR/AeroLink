@@ -10,7 +10,7 @@ export const STATE_COLORS: Record<TrackingStateName, string> = {
   CANDIDATE: 'var(--warning)',
   ACQUIRE: 'var(--accent-blue)',
   TRACK: 'var(--success)',
-  PREDICT_REACQUIRE: 'var(--prediction)',
+  PREDICT_REACQUIRE: 'var(--state-predict)',
 };
 
 export const STATE_LABELS: Record<TrackingStateName, string> = {

@@ -2,37 +2,29 @@
  * Simulation engine worker (docs/04 §6 threading model).
  * The full processing loop — scene render → disturbances → camera crop →
  * detect → track → control → metrics — runs HERE, never on the UI thread.
- * All messages to the UI carry immutable snapshots; frame buffers are
- * transferred (zero-copy) from a rotating pool.
+ *
+ * The loop itself lives in `SimulationRunner` (src/engine/simulation.ts) and
+ * is shared with the headless benchmark, demos and tests, so what is measured
+ * offline is exactly what runs here. This file owns only the things that are
+ * specific to running live in a browser: wall-clock pacing, the event log,
+ * the frame-buffer pool and the telemetry snapshots posted to the UI.
  */
 import { scenarioConfigSchema, type ScenarioConfig } from '../engine/config';
-import { createTrajectory } from '../engine/trajectories';
-import { initScene, renderScene, makeBeacon, type SceneInitResult } from '../engine/scene';
-import {
-  createCamera,
-  cropFrame,
-  stepCamera,
-  applyDisturbances,
-  atmosphereParams,
-  PlatformMotion,
-  cameraCenterPx,
-  makeGaussFor,
-} from '../engine/camera';
-import { Pipeline, type PipelineHost } from '../engine/pipeline';
-import { MetricsEngine } from '../engine/metrics';
+import { SimulationRunner, type SimulationStepResult } from '../engine/simulation';
+import { DEMO_SCRIPT, type DemoAction } from '../engine/demo';
+import type { MetricsEngine } from '../engine/metrics';
 import { eventsToCsv } from '../engine/export';
-import { makeRng, makeGaussian } from '../engine/rng';
-import type {
-  Detection,
-  FramePacket,
-  LogLevel,
-  PanTiltCommand,
-  TelemetrySnapshot,
-} from '../engine/types';
+import { assetUrl, loadModel, lastLoadError } from '../lib/load-model';
+import { createOrtBackends } from '../lib/ort-runtime';
+import { buildPatchBatch } from '../engine/nn';
+import { detectorRequiresModel } from '../engine/detectors';
+import type { LoadedModel } from '../engine/detector-ai';
+import type { LogLevel, TelemetrySnapshot } from '../engine/types';
 
 interface WorkerAPI {
   init(config: unknown): void;
   start(): void;
+  startNow(): void;
   pause(): void;
   stop(reason?: string): void;
   killBeacon(frames: number): void;
@@ -41,53 +33,70 @@ interface WorkerAPI {
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
 let config: ScenarioConfig | null = null;
-let sceneData: SceneInitResult | null = null;
-let trajectory: ReturnType<typeof createTrajectory> | null = null;
-let camera: ReturnType<typeof createCamera> | null = null;
-let platform: PlatformMotion | null = null;
-let pipeline: Pipeline | null = null;
+let runner: SimulationRunner | null = null;
+/** Trained weights, fetched once per worker and reused across runs. */
+let model: LoadedModel | null = null;
 let metrics: MetricsEngine | null = null;
-let rngMain = makeRng(1);
-let gaussMain = makeGaussian(rngMain);
-let jitterGauss = makeGaussFor(rngMain);
 
 let running = false;
 let paused = false;
-let frameIndex = 0;
-let simTimeS = 0;
 let lastLoopMs = 0;
-let killBeaconFrames = 0;
-let beacon: ReturnType<typeof makeBeacon> | null = null;
-let lastCommand: PanTiltCommand = { pan_deg_s: 0, tilt_deg_s: 0 };
-let lastDetection: Detection = {
-  found: false,
-  x: null,
-  y: null,
-  confidence: 0,
-  bbox: null,
-  method: 'cv',
-  latency_ms: 0,
-};
-let lastTrack: TelemetrySnapshot['track'] = {
-  state: 'SEARCH',
-  x: null,
-  y: null,
-  vx: null,
-  vy: null,
-  confidence: 0,
-  track_age_frames: 0,
-  lost_frames_consecutive: 0,
-  is_prediction: false,
-};
-let jitterPx = 0;
-let lastCropCenter = { x: 0, y: 0 }; // true crop center (includes jitter + platform)
 let timer: ReturnType<typeof setTimeout> | null = null;
 let framePool: ArrayBuffer[] = [];
 let poolIdx = 0;
 const POOL_SIZE = 4;
 let logIdCounter = 0;
+/** Judge-demo injection timeline; empty for a normal run (§22). */
+let demoScript: DemoAction[] = [];
+let demoFired = new Set<number>();
+/** True when the learned stages run through ONNX Runtime Web (plan2). */
+let useOrt = false;
+/** Live ORT-vs-TypeScript parity check, once per run on a real frame. */
+let parityChecked = false;
+/** Guards the async loop against re-entrancy. */
+let stepping = false;
 
-function postLog(level: LogLevel, message: string, detail?: string): void {
+/**
+ * Attach ONNX Runtime Web backends to the loaded model (plan2). The ONNX files
+ * are the exported deployed weights (scripts/ai/export_onnx.py). If the
+ * runtime cannot start, the run continues on the in-engine TypeScript forward
+ * pass of the SAME weights — and says so in the log and in every frame's
+ * provenance (aiRuntime); nothing is presented as ORT output that was not.
+ */
+async function attachOrt(m: LoadedModel): Promise<void> {
+  if (m.scorer) return;
+  try {
+    const [cnnRes, verRes] = await Promise.all([
+      fetch(assetUrl('/models/beacon-roi-v2.onnx')),
+      fetch(assetUrl('/models/track-verifier-v1.onnx')),
+    ]);
+    if (!cnnRes.ok) throw new Error(`beacon-roi-v2.onnx: HTTP ${cnnRes.status}`);
+    const cnnBytes = new Uint8Array(await cnnRes.arrayBuffer());
+    const verBytes = verRes.ok ? new Uint8Array(await verRes.arrayBuffer()) : null;
+    const b = await createOrtBackends(cnnBytes, verBytes, assetUrl('/ort/'));
+    m.scorer = b.scorer;
+    m.batchVerifier = b.batchVerifier;
+    postLog(
+      'SYSTEM',
+      `ONNX Runtime Web ready — ${b.runtime}`,
+      `beacon-roi-v2.onnx ${cnnBytes.byteLength} B` +
+        (verBytes ? ` + track-verifier-v1.onnx ${verBytes.byteLength} B` : '') +
+        `, sessions created in ${b.loadMs.toFixed(0)} ms`,
+    );
+  } catch (err) {
+    postLog(
+      'WARN',
+      'ONNX Runtime Web unavailable — learned stages use the in-engine TypeScript forward pass',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+function simTime(): number {
+  return runner ? runner.simTimeS : 0;
+}
+
+function postLog(level: LogLevel, message: string, detail?: string, frame?: number): void {
   const d = new Date();
   const pad = (v: number, n = 2) => String(v).padStart(n, '0');
   ctx.postMessage({
@@ -95,7 +104,8 @@ function postLog(level: LogLevel, message: string, detail?: string): void {
     entry: {
       id: ++logIdCounter,
       t: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`,
-      simT: simTimeS,
+      simT: simTime(),
+      frame,
       level,
       message,
       detail,
@@ -103,7 +113,7 @@ function postLog(level: LogLevel, message: string, detail?: string): void {
   });
 }
 
-function initEngine(rawConfig: unknown): void {
+async function initEngine(rawConfig: unknown): Promise<void> {
   const parsed = scenarioConfigSchema.safeParse(rawConfig);
   if (!parsed.success) {
     ctx.postMessage({ type: 'error', message: 'Configuration validation failed on worker side.' });
@@ -112,237 +122,168 @@ function initEngine(rawConfig: unknown): void {
   config = parsed.data;
   const cfg = config;
 
-  // All randomness derives from the scenario seed (determinism requirement)
-  rngMain = makeRng(cfg.seed);
-  gaussMain = makeGaussian(rngMain);
-  jitterGauss = makeGaussFor(makeRng(cfg.seed ^ 0x9e3779b9));
+  // The learned detectors need weights before the runner can be built. If the
+  // model is missing we say so and stop, rather than starting a run that is
+  // silently classical while the UI reports a learned detector.
+  if (detectorRequiresModel(cfg.tracking.detector)) {
+    if (model === null) model = await loadModel();
+    if (model === null) {
+      ctx.postMessage({
+        type: 'error',
+        message:
+          `The ${cfg.tracking.detector} detector needs a trained model, and ` +
+          'public/models/beacon-roi-v2.bin was not found. Select the classical ' +
+          'detector, or train a model with scripts/ai/train_roi.py.' +
+          (lastLoadError ? ` (load error: ${lastLoadError})` : ''),
+      });
+      return;
+    }
+    if (cfg.tracking.detector === 'fusion' && !model.verifier) {
+      ctx.postMessage({
+        type: 'error',
+        message:
+          'The hybrid detector needs the learned track verifier, and ' +
+          'public/models/track-verifier-v1.json was not found. Select another ' +
+          'detector, or train it with scripts/ai/train_track_verifier.py.',
+      });
+      return;
+    }
+    postLog('SYSTEM', `Learned model loaded — ${model.manifest.name}`,
+      `${model.manifest.paramCount} parameters`);
+    await attachOrt(model);
+    if (cfg.tracking.detector === 'fusion' && model.verifier) {
+      postLog('SYSTEM', `Track verifier loaded — ${model.verifier.name}`,
+        'temporal decoy rejection + clutter map active');
+    }
+  }
 
-  sceneData = initScene(
-    cfg.scene.width,
-    cfg.scene.height,
-    cfg.scene.backgroundLevel,
-    cfg.scene.distractorCount,
-    cfg.seed,
-    { x: cfg.beacon.startX, y: cfg.beacon.startY ?? cfg.scene.height / 2 },
-  );
-  trajectory = createTrajectory({
-    mode: cfg.beacon.motion,
-    speed: cfg.beacon.speed,
-    sceneWidth: cfg.scene.width,
-    sceneHeight: cfg.scene.height,
-    startX: cfg.beacon.startX ?? sceneData.startX,
-    startY: cfg.beacon.startY ?? sceneData.startY,
-    margin: 80,
-    rng: makeRng(cfg.seed ^ 0x1234abcd),
-  });
-  camera = createCamera({
-    maxPanSpeedDegS: cfg.camera.maxPanSpeedDegS,
-    maxTiltSpeedDegS: cfg.camera.maxTiltSpeedDegS,
-    resolutionWidth: cfg.camera.resolutionWidth,
-    resolutionHeight: cfg.camera.resolutionHeight,
-    sceneWidth: cfg.scene.width,
-    sceneHeight: cfg.scene.height,
-    fovXDeg: cfg.camera.fovXDeg,
-    fovYDeg: cfg.camera.fovYDeg,
-  });
-  platform = new PlatformMotion(cfg.platformMotion.mode, cfg.platformMotion.maxPxPerFrame, cfg.platformMotion.speed);
+  runner = new SimulationRunner(cfg, {
+    onTransition(from, to, fi) {
+      postLog('STATE', `${from} → ${to}`, undefined, fi);
+      if (to === 'SEARCH') {
+        postLog('SEARCH', 'Coarse acquisition scan started', `pattern=${cfg.tracking.searchPattern}`, fi);
+      } else if (to === 'CANDIDATE') {
+        postLog('DETECT', 'Optical candidate detected', undefined, fi);
+      } else if (to === 'ACQUIRE') {
+        postLog('ACQUIRE', 'Candidate confirmed — validating lock', undefined, fi);
+      }
+    },
+    onAcquired(t, fi) {
+      postLog('LOCK', 'Coarse optical alignment acquired', `${t.toFixed(3)}s from run start`, fi);
+    },
+    onLossConfirmed(_t, fi) {
+      postLog('LOSS', 'OPTICAL SIGNAL LOST', 'detection unavailable', fi);
+      postLog('PREDICT', 'Kalman prediction engaged', undefined, fi);
+    },
+    onReacquired(rt, fi) {
+      postLog('REACQUIRE', 'Optical signal reacquired — coarse lock restored', `${rt.toFixed(3)}s after loss`, rt !== undefined ? fi : undefined);
+    },
+  }, model);
+  metrics = runner.metrics;
 
-  beacon = makeBeacon(1, sceneData.startX, sceneData.startY, cfg.beacon.intensity);
-  frameIndex = 0;
-  simTimeS = 0;
-  killBeaconFrames = 0;
   paused = false;
   running = false;
-
-  framePool = [];
-  for (let i = 0; i < POOL_SIZE; i++) {
-    framePool.push(new ArrayBuffer(cfg.camera.resolutionWidth * cfg.camera.resolutionHeight));
-  }
-  poolIdx = 0;
+  demoFired = new Set<number>();
+  useOrt = detectorRequiresModel(cfg.tracking.detector) && !!model?.scorer;
+  parityChecked = false;
 
   const w = cfg.camera.resolutionWidth;
   const h = cfg.camera.resolutionHeight;
+  framePool = [];
+  for (let i = 0; i < POOL_SIZE; i++) {
+    framePool.push(new ArrayBuffer(w * h));
+  }
+  poolIdx = 0;
 
-  const host: PipelineHost = {
-    applyCommand(cmd: PanTiltCommand, dtS: number) {
-      const r = stepCamera(camera!, cmd.pan_deg_s, cmd.tilt_deg_s, dtS);
-      lastCommand = cmd;
-      return { pan_deg: camera!.pan_deg, tilt_deg: camera!.tilt_deg };
-    },
-    viewportCenter() {
-      // true crop center (with jitter + platform offsets applied this frame)
-      return { x: lastCropCenter.x, y: lastCropCenter.y };
-    },
-    pixelsPerDeg() {
-      return { x: camera!.pxPerDegX, y: camera!.pxPerDegY };
-    },
-    sceneToImage(x: number, y: number) {
-      const ix = x - (lastCropCenter.x - w / 2);
-      const iy = y - (lastCropCenter.y - h / 2);
-      if (ix < 0 || iy < 0 || ix >= w || iy >= h) return null;
-      return { x: ix, y: iy };
-    },
-    onTransition(from: string, to: string, fi: number) {
-      postLog('STATE', `${from} → ${to}`, `frame=${fi}`);
-      // docs/04 §4.13: integrator reset on entry to SEARCH / ACQUIRE
-      if (to === 'SEARCH' || to === 'ACQUIRE') {
-        pipeline?.resetControllerIntegrator();
-      }
-    },
-    onAcquired(t: number, _fi: number) {
-      void _fi;
-      postLog('METRIC', 'Acquisition confirmed', `${t.toFixed(3)}s from run start`);
-    },
-    onLossConfirmed(_t: number, _fi: number) {
-      postLog('TRACK', 'Target loss confirmed — prediction engaged');
-    },
-    onReacquired(rt: number, _fi: number) {
-      postLog('METRIC', 'Re-acquired target', `${rt.toFixed(3)}s after loss`);
-    },
-  };
-
-  pipeline = new Pipeline(cfg, { mode: 'simulation', fps: cfg.camera.updateHz, resolution: [w, h], has_ground_truth: true }, host, 'simulation');
-  metrics = pipeline.getMetrics();
-
-  postLog('INFO', 'Engine initialized', `scene ${cfg.scene.width}×${cfg.scene.height}, cam ${w}×${h} @ ${cfg.camera.updateHz}Hz, seed ${cfg.seed}`);
+  postLog(
+    'SYSTEM',
+    'Mission initialized',
+    `scene ${cfg.scene.width}×${cfg.scene.height}, cam ${w}×${h} @ ${cfg.camera.updateHz}Hz, seed ${cfg.seed}`,
+  );
   ctx.postMessage({ type: 'initialized' });
 }
 
 function loop(): void {
-  if (!running) return;
+  if (!running || stepping) return;
   const loopStart = performance.now();
-  stepOnce();
-  const cfg = config!;
-  const interval = 1000 / cfg.camera.updateHz;
-  const spent = performance.now() - loopStart;
-  const wait = Math.max(1, interval - spent);
-  timer = setTimeout(loop, wait);
+  stepping = true;
+  void stepOnce()
+    .catch((err: unknown) => {
+      postLog('ERROR', 'Frame step failed', err instanceof Error ? err.message : String(err));
+      running = false;
+    })
+    .finally(() => {
+      stepping = false;
+      if (!running || paused) return;
+      const cfg = config!;
+      const interval = 1000 / cfg.camera.updateHz;
+      const spent = performance.now() - loopStart;
+      const wait = Math.max(1, interval - spent);
+      timer = setTimeout(loop, wait);
+    });
 }
 
-function stepOnce(): void {
+async function stepOnce(): Promise<void> {
   const cfg = config;
-  if (!cfg || !sceneData || !trajectory || !camera || !pipeline || !metrics || !beacon) return;
+  if (!cfg || !runner || !metrics) return;
 
+  // Live pacing: advance by the real elapsed time, bounded so a stalled tab
+  // cannot teleport the beacon. (Headless callers pass a fixed dt instead,
+  // which is what makes the benchmark reproducible.)
   const now = performance.now();
   const wallDt = lastLoopMs ? (now - lastLoopMs) / 1000 : 1 / cfg.camera.updateHz;
   lastLoopMs = now;
   const dt = Math.min(0.2, Math.max(0.001, wallDt));
-  simTimeS += dt;
-  frameIndex++;
 
-  // ---- Ground truth update (beacon trajectory) ----
-  const traj = trajectory.at(simTimeS);
-  beacon.x_px = traj.x;
-  beacon.y_px = traj.y;
-  beacon.vx_px_s = traj.vx;
-  beacon.vy_px_s = traj.vy;
-  beacon.visible = true;
-
-  // blink (temporary loss demonstration)
-  let blinkOff = false;
-  if (cfg.beacon.blinkPeriodS > 0) {
-    const phase = simTimeS % cfg.beacon.blinkPeriodS;
-    blinkOff = phase < cfg.beacon.blinkPeriodS * 0.12;
-  }
-
-  // ---- Render clean scene ----
-  renderScene({
-    scene: sceneData.scene,
-    background: sceneData.background,
-    sceneWidth: cfg.scene.width,
-    sceneHeight: cfg.scene.height,
-    backgroundLevel: cfg.scene.backgroundLevel,
-    beacon,
-    beaconSizePx: cfg.beacon.sizePx,
-    beaconShape: 'square',
-    killBeacon: killBeaconFrames > 0,
-    blinkOff,
-    distractors: sceneData.distractors,
-  });
-  if (killBeaconFrames > 0) {
-    killBeaconFrames--;
-    if (killBeaconFrames === 0) postLog('INFO', 'Beacon restored after kill');
-  }
-
-  // ---- Camera pose: platform motion + jitter ----
-  const plat = platform ? platform.step(dt) : { dx: 0, dy: 0 };
-  let jitterDx = 0;
-  let jitterDy = 0;
-  if (cfg.jitter.enabled && cfg.jitter.maxPxPerFrame > 0) {
-    jitterDx = (jitterGauss() * cfg.jitter.maxPxPerFrame) / 2;
-    jitterDy = (jitterGauss() * cfg.jitter.maxPxPerFrame) / 2;
-    const mag = Math.hypot(jitterDx, jitterDy);
-    if (mag > cfg.jitter.maxPxPerFrame) {
-      const s = cfg.jitter.maxPxPerFrame / mag;
-      jitterDx *= s;
-      jitterDy *= s;
-    }
-    if (frameIndex % 30 === 0 && mag > 1) {
-      postLog('DIST', 'Camera jitter', `${mag.toFixed(1)} px`);
-    }
-  }
-  jitterPx = Math.hypot(jitterDx, jitterDy);
-
-  const cc = cameraCenterPx(camera);
-  const centerX = cc.cx + plat.dx + jitterDx;
-  const centerY = cc.cy + plat.dy + jitterDy;
-  lastCropCenter = { x: centerX, y: centerY };
-
-  // ---- Crop sensor window ----
   const w = cfg.camera.resolutionWidth;
   const h = cfg.camera.resolutionHeight;
   const frameBuf = new Uint8Array(framePool[poolIdx]);
   poolIdx = (poolIdx + 1) % POOL_SIZE;
-  cropFrame(sceneData.scene, cfg.scene.width, cfg.scene.height, frameBuf, w, h, centerX, centerY);
 
-  // ---- Disturbance chain (does NOT touch ground truth) ----
-  const atm = atmosphereParams(cfg.atmosphere.mode, cfg.atmosphere.contrastFactor, cfg.atmosphere.brightnessFactor);
-  applyDisturbances(
-    frameBuf,
-    w,
-    h,
-    {
-      saltPepperPercent: cfg.noise.saltPepperPercent,
-      gaussianSigma: cfg.noise.gaussianSigma,
-      poissonEnabled: cfg.noise.poissonEnabled,
-      contrastFactor: atm.contrastFactor,
-      brightnessFactor: atm.brightnessFactor,
-      rainStrength: atm.rainStrength,
-    },
-    rngMain,
-    gaussMain,
-  );
+  // Learned detectors with an ORT backend step asynchronously: the CNN and the
+  // track verifier run in ONNX Runtime Web on THIS frame before the tracker,
+  // controller and mount see the result.
+  const step = useOrt ? await runner.stepAsync(dt, frameBuf) : runner.step(dt, frameBuf);
+  if (!running) return;
+  const result = step.pipeline;
+  if (useOrt && !parityChecked && result.detection.found && result.detection.x !== null && model?.scorer) {
+    parityChecked = true;
+    // Live runtime parity on a real observed frame: the same ROI through ORT
+    // and through the in-engine forward pass of the same weights.
+    const pt = { x: result.detection.x, y: result.detection.y as number };
+    const ortP = (await model.scorer.scoreBatch(buildPatchBatch(step.frame, step.width, step.height, [pt]), 1))[0];
+    const tsP = model.net.scoreAt(step.frame, step.width, step.height, pt.x, pt.y);
+    postLog(
+      'SYSTEM',
+      'Runtime parity on live frame',
+      `ROI (${pt.x.toFixed(1)}, ${pt.y.toFixed(1)}): ORT ${ortP.toFixed(6)} vs TS ${tsP.toFixed(6)} · |Δ| ${Math.abs(ortP - tsP).toExponential(2)}`,
+      step.frameIndex,
+    );
+  }
 
-  // ---- Frame packet (ground truth is IMAGE-space for the metrics branch,
-  // per docs/MVP-Tech-Doc §5 — never seen by the detector) ----
-  const gtImageX = beacon.x_px - (centerX - w / 2);
-  const gtImageY = beacon.y_px - (centerY - h / 2);
-  const packet: FramePacket = {
-    frame: frameBuf,
-    width: w,
-    height: h,
-    timestamp_s: simTimeS,
-    frame_index: frameIndex,
-    ground_truth: killBeaconFrames > 0 || blinkOff ? { ...beacon, x_px: gtImageX, y_px: gtImageY, visible: false } : { ...beacon, x_px: gtImageX, y_px: gtImageY },
-    pan_deg: camera.pan_deg,
-    tilt_deg: camera.tilt_deg,
-  };
+  if (step.beaconRestored) postLog('SYSTEM', 'Beacon restored after kill', undefined, step.frameIndex);
+  if (cfg.jitter.enabled && step.frameIndex % 30 === 0 && step.jitterPx > 1) {
+    postLog('DISTURBANCE', 'Camera jitter', `${step.jitterPx.toFixed(1)} px`, step.frameIndex);
+  }
+  emitMissionEvents(cfg, step);
+  runDemoScript(step.timestampS);
 
-  // ---- Pipeline: detect → track → control → metrics ----
-  const result = pipeline.step(packet);
-  lastDetection = result.detection;
-  lastTrack = result.track;
-
-  // ---- Telemetry snapshot to UI (transferred frame buffer, zero-copy) ----
-  const metricsSnap = metrics.snapshot(simTimeS);
+  // ---- Telemetry snapshot to UI (transferred frame buffer) ----
+  const metricsSnap = metrics.snapshot(step.timestampS);
   const snap: TelemetrySnapshot = {
-    frameIndex,
-    timestampS: simTimeS,
+    frameIndex: step.frameIndex,
+    timestampS: step.timestampS,
     detection: { ...result.detection },
     track: { ...result.track },
     command: { ...result.command },
     camera: { pan_deg: result.cameraPan, tilt_deg: result.cameraTilt },
-    groundTruth: { x_px: beacon.x_px, y_px: beacon.y_px, vx_px_s: beacon.vx_px_s, vy_px_s: beacon.vy_px_s }, // scene-space for 3D/trajectory views
+    // scene-space for the 3D / trajectory views
+    groundTruth: {
+      x_px: step.beacon.x_px,
+      y_px: step.beacon.y_px,
+      vx_px_s: step.beacon.vx_px_s,
+      vy_px_s: step.beacon.vy_px_s,
+    },
     beaconImageX: result.beaconImageX,
     beaconImageY: result.beaconImageY,
     errorPx: result.errorPx,
@@ -350,8 +291,15 @@ function stepOnce(): void {
     lost: result.track.state === 'SEARCH',
     processingMs: result.processingMs,
     metrics: metricsSnap,
-    jitterPx,
+    jitterPx: step.jitterPx,
     activeDisturbances: collectActiveDisturbances(cfg),
+    mount: step.mount,
+    link: step.link,
+    mission: step.mission,
+    predicted:
+      result.predictedX !== null && result.predictedY !== null
+        ? { x: result.predictedX, y: result.predictedY }
+        : null,
   };
 
   const transferBuf = frameBuf.buffer.slice(0);
@@ -362,15 +310,129 @@ function stepOnce(): void {
       width: w,
       height: h,
       snapshot: snap,
-      cameraPose: { pan_deg: camera.pan_deg, tilt_deg: camera.tilt_deg },
+      cameraPose: { pan_deg: result.cameraPan, tilt_deg: result.cameraTilt },
       viewportCenterScene: { x: result.viewportCenterSceneX, y: result.viewportCenterSceneY },
     },
     [transferBuf],
   );
 
   // end-of-run
-  if (simTimeS >= cfg.durationS) {
+  if (step.timestampS >= cfg.durationS) {
     finishRun('Scenario duration reached');
+  }
+}
+
+/**
+ * The §14 acquisition chain, emitted from real engine state.
+ *
+ * Throttled deliberately: the loop runs at 30 Hz and a line per frame would
+ * bury the story. While converging (not yet locked) the stream is dense enough
+ * to follow the slew; once locked it drops to a heartbeat.
+ */
+let lastDetectLoggedFrame = -999;
+function emitMissionEvents(cfg: ScenarioConfig, step: SimulationStepResult): void {
+  const r = step.pipeline;
+  const fi = step.frameIndex;
+  const w = cfg.camera.resolutionWidth;
+  const h = cfg.camera.resolutionHeight;
+
+  // First detection after a dry spell — the moment the beacon is seen.
+  if (r.detection.found && r.detection.x !== null && r.detection.y !== null) {
+    if (fi - lastDetectLoggedFrame > 45) {
+      postLog(
+        'DETECT',
+        'Optical candidate detected',
+        `centroid=(${r.detection.x.toFixed(1)}, ${r.detection.y.toFixed(1)}) confidence=${r.detection.confidence.toFixed(2)}`,
+        fi,
+      );
+      lastDetectLoggedFrame = fi;
+    }
+  } else {
+    lastDetectLoggedFrame = -999;
+  }
+
+  // ── plan2: the whole chain for ONE frame, from the engine's own state ──
+  // camera frame → classical CV → AI inference → fusion → Kalman → LOS → PID
+  // → mount. Throttled to once a second so it stays readable.
+  const pv = r.detection.provenance;
+  if (pv && fi % 30 === 0) {
+    const f = (v: number | null | undefined, d = 1) => (v === null || v === undefined ? '—' : v.toFixed(d));
+    postLog(
+      'DETECT',
+      'Perception chain',
+      `CV ${pv.cv ? `(${f(pv.cv.x)}, ${f(pv.cv.y)}) c=${f(pv.cv.confidence, 2)}` : 'none'} [${pv.candidateCount} cand] · ` +
+        `AI ${pv.ai ? `(${f(pv.ai.x)}, ${f(pv.ai.y)}) p=${f(pv.ai.confidence, 3)}` : 'none'} [${pv.aiScored ?? 0} ROIs, ${f(pv.aiInferenceMs, 2)} ms, ${pv.aiRuntime ?? '—'}] · ` +
+        `FUSION ${pv.chosenBy}${pv.trackP != null ? ` trackP=${f(pv.trackP, 2)}` : ''} → ` +
+        (r.detection.found ? `(${f(r.detection.x)}, ${f(r.detection.y)}) conf=${f(r.detection.confidence, 2)}` : 'no target') +
+        ` · ${pv.decisionReason ?? ''}`,
+      fi,
+    );
+    postLog(
+      'TRACK',
+      'Kalman → PID → mount',
+      `state=${r.track.state} pred=(${f(r.predictedX)}, ${f(r.predictedY)}) est=(${f(r.track.x)}, ${f(r.track.y)}) · ` +
+        `cmd pan=${f(r.command.pan_deg_s, 2)} tilt=${f(r.command.tilt_deg_s, 2)} °/s · ` +
+        `mount actual=${f(step.mount.actualPanRateDegS, 2)}/${f(step.mount.actualTiltRateDegS, 2)} °/s az=${f(step.mount.azimuthDeg, 3)}° el=${f(step.mount.elevationDeg, 3)}°`,
+      fi,
+    );
+  }
+
+  const tracking = r.track.state === 'TRACK' || r.track.state === 'PREDICT_REACQUIRE';
+  if (!tracking || r.track.x === null || r.track.y === null) return;
+
+  const locked = r.errorPx !== null && r.errorPx <= cfg.tracking.lockRadiusPx;
+  // dense while slewing onto the target, sparse once settled
+  const every = locked ? 60 : 12;
+  if (fi % every !== 0) return;
+
+  // LOS solution: pixel error → angular error (docs/04 §4.13)
+  const dx = r.track.x - w / 2;
+  const dy = r.track.y - h / 2;
+  const azErr = (dx / w) * cfg.camera.fovXDeg;
+  const elErr = (dy / h) * cfg.camera.fovYDeg;
+  const sgn = (v: number, d: number) => `${v >= 0 ? '+' : ''}${v.toFixed(d)}`;
+
+  postLog(
+    'TRACK',
+    'LOS solution computed',
+    `dx=${sgn(dx, 1)} px dy=${sgn(dy, 1)} px · az=${sgn(azErr, 3)}° el=${sgn(elErr, 3)}°`,
+    fi,
+  );
+  postLog(
+    'CONTROL',
+    'Pan/tilt command generated',
+    `pan=${sgn(r.command.pan_deg_s, 2)} °/s tilt=${sgn(r.command.tilt_deg_s, 2)} °/s`,
+    fi,
+  );
+  postLog(
+    'MOUNT',
+    step.mount.accelLimited ? 'Receiver slewing (accel limited)' : 'Receiver slewing',
+    `az=${sgn(step.mount.azimuthDeg, 3)}° el=${sgn(step.mount.elevationDeg, 3)}° · actual=${sgn(step.mount.actualPanRateDegS, 2)}/${sgn(step.mount.actualTiltRateDegS, 2)} °/s`,
+    fi,
+  );
+}
+
+/**
+ * Fire any scripted demo injections whose time has arrived. This only changes
+ * CONDITIONS — atmosphere, noise, whether the beacon is visible. It never
+ * touches detection, tracking or control, and it never claims an outcome:
+ * what the loop does in response is the loop's own behaviour.
+ */
+function runDemoScript(timestampS: number): void {
+  if (demoScript.length === 0 || !runner) return;
+  for (let i = 0; i < demoScript.length; i++) {
+    if (demoFired.has(i)) continue;
+    const a = demoScript[i];
+    if (timestampS < a.atS) continue;
+    demoFired.add(i);
+    if (a.kind === 'disturbance') {
+      runner.setDisturbance(a.payload as Parameters<SimulationRunner['setDisturbance']>[0]);
+      postLog('DISTURBANCE', a.label, 'injected by demonstration script', runner.frameIndex);
+    } else if (a.kind === 'kill-beacon') {
+      const frames = Number((a.payload as { frames?: number })?.frames ?? 45);
+      runner.killBeaconForFrames(frames);
+      postLog('WARN', a.label, `${frames} frames`, runner.frameIndex);
+    }
   }
 }
 
@@ -392,37 +454,63 @@ function finishRun(reason: string): void {
     clearTimeout(timer);
     timer = null;
   }
-  if (!metrics || !pipeline || !config) return;
+  if (!metrics || !runner || !config) return;
+  runner.missionTracker.markReportGenerated(runner.simTimeS, runner.frameIndex);
   const result = metrics.finalize(config.scenarioName + reason);
-  postLog('INFO', `Run complete — ${reason}`, `${result.frames_processed} frames processed`);
+  postLog('SYSTEM', `Run complete — ${reason}`, `${result.frames_processed} frames processed`);
   const csv = eventsToCsv(metrics.eventRows);
   ctx.postMessage({ type: 'result', result, eventsCsv: csv });
   ctx.postMessage({ type: 'phase', phase: 'complete' });
 }
 
+/**
+ * Initialisation is asynchronous (model fetch, ONNX Runtime session
+ * creation), but the client posts `init` and `start` back to back. `start`
+ * therefore waits for the most recent `init` to settle; without this it could
+ * arrive while the runner was still being built and be dropped — or restart
+ * the previous run's runner.
+ */
+let initPromise: Promise<void> = Promise.resolve();
+
 const api: WorkerAPI = {
   init(rawConfig) {
-    initEngine(rawConfig);
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    running = false;
+    runner = null;
+    initPromise = initEngine(rawConfig).catch((err: unknown) => {
+      ctx.postMessage({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Engine initialisation failed.',
+      });
+    });
   },
   start() {
-    if (!config || !pipeline) return;
+    void initPromise.then(() => api.startNow());
+  },
+  startNow() {
+    if (!config || !runner) return;
     running = true;
     paused = false;
     lastLoopMs = 0;
-    postLog('INFO', 'Simulation started', `run seed=${config.seed}`);
+    postLog('SCENARIO', `Scenario armed — ${config.scenarioName}`, `seed=${config.seed} duration=${config.durationS}s`);
     ctx.postMessage({ type: 'phase', phase: 'running' });
     loop();
   },
   pause() {
     if (!running) return;
     paused = !paused;
-    postLog('INFO', paused ? 'Simulation paused' : 'Simulation resumed');
+    postLog('SYSTEM', paused ? 'Simulation paused' : 'Simulation resumed');
     ctx.postMessage({ type: 'phase', phase: paused ? 'paused' : 'running' });
-    // simple pause: stop scheduling while paused, resume restarts loop
     if (paused && timer) {
       clearTimeout(timer);
       timer = null;
     } else if (!paused) {
+      // Drop the stale timestamp so the first frame after a resume advances by
+      // one nominal frame instead of the whole pause duration.
+      lastLoopMs = 0;
       loop();
     }
   },
@@ -434,12 +522,12 @@ const api: WorkerAPI = {
     }
   },
   killBeacon(frames) {
-    killBeaconFrames = frames;
+    runner?.killBeaconForFrames(frames);
     postLog('WARN', `DEBUG: beacon killed for ${frames} frames`);
   },
 };
 
-const workerSelf = self as any;
+const workerSelf = self as unknown as { onmessage: (e: MessageEvent) => void };
 workerSelf.onmessage = (e: MessageEvent) => {
   const msg = e.data;
   switch (msg.type) {
@@ -458,8 +546,15 @@ workerSelf.onmessage = (e: MessageEvent) => {
     case 'killBeacon':
       api.killBeacon(msg.frames);
       break;
+    case 'setDemoScript':
+      demoScript = msg.enabled ? DEMO_SCRIPT : [];
+      demoFired = new Set<number>();
+      break;
+    case 'setDisturbance':
+      runner?.setDisturbance(msg.payload);
+      break;
     case 'resetIntegrator':
-      pipeline?.resetControllerIntegrator();
+      runner?.pipeline.resetControllerIntegrator();
       break;
   }
 };

@@ -51,4 +51,10 @@ prompt
 
 server.log
 # Skills directory
-/skills/
+/skills/benchmark-results/
+
+# Local ML datasets and training artefacts (regenerate with scripts/)
+datasets/
+
+# ONNX Runtime Web WASM assets — copied from node_modules by `bun run ort:assets` (prebuild/predev)
+public/ort/

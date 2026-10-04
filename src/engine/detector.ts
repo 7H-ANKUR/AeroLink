@@ -16,6 +16,35 @@ export interface DetectorParams {
   minAreaPx: number;
   maxAreaPx: number;
   expectedBeaconSize: number; // nominal spot size in px
+  /** Composite-confidence floor; weaker candidates are rejected (§8). */
+  minConfidence: number;
+}
+
+/**
+ * One optical spot proposed by the classical stage, with the component
+ * statistics the decision engine and the learned detector both need.
+ * Purely an observation — nothing here is derived from ground truth.
+ */
+export interface BeaconCandidate {
+  /** Intensity-weighted centroid, image space. */
+  x: number;
+  y: number;
+  bbox: [number, number, number, number];
+  area: number;
+  maxIntensity: number;
+  /** Long side / short side, >= 1. */
+  aspect: number;
+  sizeScore: number;
+  shapeScore: number;
+  brightnessScore: number;
+  /** Composite classical confidence, ungated by any temporal term. */
+  cvConfidence: number;
+  /**
+   * Which perception branch proposed this spot (AI plan Phase 5): the
+   * classical threshold stage, the learned branch's local-contrast proposer,
+   * or both (the same spot found independently by each).
+   */
+  source?: 'cv' | 'ai' | 'both';
 }
 
 interface Component {
@@ -54,6 +83,93 @@ export class ClassicalDetector {
     tStartMs: number,
     predictHint: { x: number; y: number } | null,
   ): Detection {
+    const components = this.extractComponents(frame, width, height);
+
+    if (components.length === 0) {
+      return {
+        found: false,
+        x: null,
+        y: null,
+        confidence: 0,
+        bbox: null,
+        method: ALLOWED_METHOD,
+        latency_ms: nowMs() - tStartMs,
+      };
+    }
+
+    // Candidate scoring: brightness x size x shape (+ temporal proximity gate)
+    let best: Component | null = null;
+    let bestScore = -1;
+    for (const c of components) {
+      const w = c.maxX - c.minX + 1;
+      const h = c.maxY - c.minY + 1;
+      const aspect = w > h ? w / h : h / w;
+      const sizeScore = sizeAffinity(c.area, this.params.expectedBeaconSize);
+      const shapeScore = 1 / aspect; // square-ish spots preferred (PS default square)
+      const brightnessScore = c.maxIntensity / 255;
+      // brightness-weighted: the optical beacon is by far the brightest
+      // object in the frame — a dim decoy must never outrank it
+      let score = brightnessScore * 0.45 + sizeScore * 0.35 + shapeScore * 0.2;
+      if (predictHint) {
+        const cx = c.sumX / c.sumW;
+        const cy = c.sumY / c.sumW;
+        const dist = Math.hypot(cx - predictHint.x, cy - predictHint.y);
+        const gate = dist < 60 ? 1 : dist < 140 ? 0.4 : 0.05; // sticky-track gating
+        score *= gate;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = c;
+      }
+    }
+
+    const c = best as Component;
+    const bestConfidence = clamp01(bestScore * 1.25);
+    // Confidence floor — COLD SEARCH ONLY.
+    //
+    // With no active track, a weak candidate is almost certainly clutter (a
+    // rain streak, a noise blob), and accepting it makes the tracker lock onto
+    // junk while the beacon is out of frame.
+    //
+    // With a prediction hint, temporal consistency is itself evidence (§8:
+    // "when locked, prefer candidates consistent with predicted position"), and
+    // the floor must NOT apply: a beacon clipped at the frame edge scores low
+    // on size affinity, and rejecting it blocks reacquisition. Measured: the
+    // floor applied unconditionally drove blink-scenario target loss from
+    // 1.56 % to 61.7 %.
+    if (predictHint === null && bestConfidence < this.params.minConfidence) {
+      return {
+        found: false,
+        x: null,
+        y: null,
+        confidence: bestConfidence,
+        bbox: null,
+        method: ALLOWED_METHOD,
+        latency_ms: nowMs() - tStartMs,
+      };
+    }
+    // Intensity-weighted centroid (docs/04 §4.10 — the PS evaluates
+    // "centroiding error" specifically, so we use the weighted centroid).
+    const cx = c.sumX / c.sumW;
+    const cy = c.sumY / c.sumW;
+    const confidence = bestConfidence;
+
+    return {
+      found: true,
+      x: cx,
+      y: cy,
+      confidence,
+      bbox: [c.minX, c.minY, c.maxX - c.minX + 1, c.maxY - c.minY + 1],
+      method: ALLOWED_METHOD,
+      latency_ms: nowMs() - tStartMs,
+    };
+  }
+  /**
+   * Connected-component extraction, shared by `detect()` and
+   * `detectCandidates()`. 4-connectivity, iterative flood fill — no recursion,
+   * bounded memory. Only components inside the area window survive.
+   */
+  private extractComponents(frame: Uint8Array, width: number, height: number): Component[] {
     const { threshold, minAreaPx, maxAreaPx } = this.params;
     const n = width * height;
     if (this.labelW !== width || this.labelH !== height) {
@@ -65,8 +181,6 @@ export class ClassicalDetector {
       this.labels.fill(0);
     }
 
-    // Connected-component labeling over the thresholded mask (4-connectivity,
-    // iterative flood fill — no recursion, bounded memory).
     const labels = this.labels;
     const stack = this.stack;
     const components: Component[] = [];
@@ -137,62 +251,58 @@ export class ClassicalDetector {
         components.push(comp);
       }
     }
+    return components;
+  }
 
-    if (components.length === 0) {
-      return {
-        found: false,
-        x: null,
-        y: null,
-        confidence: 0,
-        bbox: null,
-        method: ALLOWED_METHOD,
-        latency_ms: nowMs() - tStartMs,
-      };
-    }
-
-    // Candidate scoring: brightness x size x shape (+ temporal proximity gate)
-    let best: Component | null = null;
-    let bestScore = -1;
+  /**
+   * Multi-candidate output — the CV half of the hybrid detector.
+   *
+   * `detect()` collapses the component list to a single answer because the
+   * classical pipeline has to commit. The fusion engine must NOT: it needs
+   * every plausible optical spot so the learned model can score each one and
+   * the decision engine can weigh them against the Kalman prediction.
+   *
+   * The scores here are deliberately UNGATED — no `predictHint` term is
+   * applied. Temporal reasoning belongs to the decision engine (fusion.ts),
+   * which has the track state and the lock hysteresis; baking a proximity
+   * multiplier in here would apply it twice.
+   *
+   * Ground truth is not a parameter and never will be.
+   */
+  detectCandidates(
+    frame: Uint8Array,
+    width: number,
+    height: number,
+    maxCandidates = 12,
+  ): BeaconCandidate[] {
+    const components = this.extractComponents(frame, width, height);
+    const out: BeaconCandidate[] = [];
     for (const c of components) {
       const w = c.maxX - c.minX + 1;
       const h = c.maxY - c.minY + 1;
       const aspect = w > h ? w / h : h / w;
       const sizeScore = sizeAffinity(c.area, this.params.expectedBeaconSize);
-      const shapeScore = 1 / aspect; // square-ish spots preferred (PS default square)
+      const shapeScore = 1 / aspect;
       const brightnessScore = c.maxIntensity / 255;
-      // brightness-weighted: the optical beacon is by far the brightest
-      // object in the frame — a dim decoy must never outrank it
-      let score = brightnessScore * 0.45 + sizeScore * 0.35 + shapeScore * 0.2;
-      if (predictHint) {
-        const cx = c.sumX / c.sumW;
-        const cy = c.sumY / c.sumW;
-        const dist = Math.hypot(cx - predictHint.x, cy - predictHint.y);
-        const gate = dist < 60 ? 1 : dist < 140 ? 0.4 : 0.05; // sticky-track gating
-        score *= gate;
-      }
-      if (score > bestScore) {
-        bestScore = score;
-        best = c;
-      }
+      const composite = brightnessScore * 0.45 + sizeScore * 0.35 + shapeScore * 0.2;
+      out.push({
+        x: c.sumX / c.sumW,
+        y: c.sumY / c.sumW,
+        bbox: [c.minX, c.minY, w, h],
+        area: c.area,
+        maxIntensity: c.maxIntensity,
+        aspect,
+        sizeScore,
+        shapeScore,
+        brightnessScore,
+        cvConfidence: clamp01(composite * 1.25),
+        source: 'cv',
+      });
     }
-
-    const c = best as Component;
-    // Intensity-weighted centroid (docs/04 §4.10 — the PS evaluates
-    // "centroiding error" specifically, so we use the weighted centroid).
-    const cx = c.sumX / c.sumW;
-    const cy = c.sumY / c.sumW;
-    const confidence = clamp01(bestScore * 1.25);
-
-    return {
-      found: true,
-      x: cx,
-      y: cy,
-      confidence,
-      bbox: [c.minX, c.minY, c.maxX - c.minX + 1, c.maxY - c.minY + 1],
-      method: ALLOWED_METHOD,
-      latency_ms: nowMs() - tStartMs,
-    };
+    out.sort((a, b) => b.cvConfidence - a.cvConfidence);
+    return out.length > maxCandidates ? out.slice(0, maxCandidates) : out;
   }
+
 }
 
 function sizeAffinity(area: number, nominal: number): number {

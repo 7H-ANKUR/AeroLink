@@ -255,7 +255,7 @@ describe('Beacon detector', () => {
         if (x >= 0 && y >= 0 && x < W && y < H) f[y * W + x] = val;
   }
   const det = () =>
-    new ClassicalDetector({ threshold: 90, minAreaPx: 4, maxAreaPx: 1200, expectedBeaconSize: 100 });
+    new ClassicalDetector({ threshold: 90, minAreaPx: 4, maxAreaPx: 1200, expectedBeaconSize: 100 , minConfidence: 0.5});
 
   test('finds 10×10 square, centroid = blob center, bbox 10×10', () => {
     const f = makeFrame();
@@ -311,7 +311,7 @@ describe('Beacon detector', () => {
     };
     drawSq(24, 48, 10, 250);
     drawSq(104, 48, 10, 250);
-    const d = () => new ClassicalDetector({ threshold: 90, minAreaPx: 4, maxAreaPx: 1200, expectedBeaconSize: 100 });
+    const d = () => new ClassicalDetector({ threshold: 90, minAreaPx: 4, maxAreaPx: 1200, expectedBeaconSize: 100 , minConfidence: 0.5});
     // hint near right blob: left blob is 80 px away → outside the 60 px sticky gate
     const nearB = d().detect(f, W2, H2, 0, { x: 104, y: 48 });
     expect(nearB.x).toBeGreaterThan(95);

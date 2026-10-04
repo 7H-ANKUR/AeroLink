@@ -4,68 +4,90 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * FSOC-PAT design tokens — professional dark aerospace laboratory theme
- * (docs/Frontend-Design §2.2, §37, §38). Dark-only instrument theme.
+ * FSOC-PAT design tokens — warm light laboratory theme.
+ * Light-only: a cream ground with white instrument panels and a burnt-orange
+ * accent. Every surface, text and status colour in the app resolves through
+ * these variables, so this block is the single place the skin is defined.
+ *
+ * Contrast: text tokens are chosen to clear WCAG AA (4.5:1) on --bg-1 white;
+ * status colours clear it too, so state text stays legible, not just decorative.
  */
 :root {
-  --bg-0: #0a0d10;
-  --bg-1: #0e1216;
-  --bg-2: #13181d;
-  --bg-3: #181f25;
+  --bg-0: #fbf4ee; /* page ground */
+  --bg-1: #ffffff; /* instrument panel */
+  --bg-2: #f9f5f0; /* inset / raised tile */
+  --bg-3: #f3ede6; /* hover + active */
 
-  --border-1: #252c33;
-  --border-2: #313a43;
+  --border-1: #f1e6dc;
+  --border-2: #e5d8ca;
 
-  --text-0: #f3f6f8;
-  --text-1: #c3ccd4;
-  --text-2: #7d8994;
-  --text-3: #58636d;
+  --text-0: #16161a;
+  --text-1: #3a3742;
+  --text-2: #6b6775;
+  --text-3: #78737f;
 
-  --accent-cyan: #72d9e8;
-  --accent-blue: #8faee8;
+  /* Accent keeps its historical variable name so every consumer follows.
+     --accent-vivid is graphics-only (fills, rings, arcs) where the 3:1 bar
+     applies; --accent-cyan is the text/button-safe tone at 5.3:1 on white. */
+  --accent-cyan: #ce4710;
+  --accent-vivid: #f2682a;
+  --accent-blue: #3d6bb8;
 
-  --success: #79c99b;
-  --warning: #d8b56b;
-  --danger: #d87575;
+  --success: #2e7d4f;
+  --warning: #9a6410;
+  --danger: #b02d22;
 
+  /* Tinted panel fills, used for the cards that carry live state. */
+  --tint-warm: #fde8da;
+  --tint-warm-ink: #8a5e43;
+  --tint-mint: #d9f0de;
+  --tint-mint-ink: #3f6b4c;
+  --tint-accent-soft: #fdeee5;
+
+  /* Overlay colours are drawn ON the dark sensor frame, never on the light
+     chrome — they stay bright on purpose. */
   --beacon: #fff7d8;
   --ground-truth: #90a7ff;
   --prediction: #d7b36e;
+  /* Light-chrome equivalent of --prediction for PREDICT_REACQUIRE text. */
+  --state-predict: #a85a1b;
+  /* The camera frame itself: sensor data, not theme. */
+  --sensor-void: #131a28;
 
-  /* shadcn variable mapping (dark instrument theme) */
+  /* shadcn variable mapping (light instrument theme) */
   --background: var(--bg-0);
   --foreground: var(--text-0);
   --card: var(--bg-1);
   --card-foreground: var(--text-0);
-  --popover: var(--bg-2);
+  --popover: var(--bg-1);
   --popover-foreground: var(--text-0);
   --primary: var(--accent-cyan);
-  --primary-foreground: #06272c;
-  --secondary: var(--bg-3);
+  --primary-foreground: #ffffff;
+  --secondary: var(--bg-2);
   --secondary-foreground: var(--text-1);
   --muted: var(--bg-2);
   --muted-foreground: var(--text-2);
   --accent: var(--bg-3);
   --accent-foreground: var(--text-0);
   --destructive: var(--danger);
-  --destructive-foreground: #2a0d0d;
+  --destructive-foreground: #ffffff;
   --border: var(--border-1);
   --input: var(--border-1);
   --ring: var(--accent-cyan);
   --chart-1: var(--accent-cyan);
-  --chart-2: var(--ground-truth);
-  --chart-3: var(--prediction);
+  --chart-2: var(--accent-blue);
+  --chart-3: var(--warning);
   --chart-4: var(--success);
-  --chart-5: var(--warning);
+  --chart-5: var(--state-predict);
   --sidebar: var(--bg-1);
   --sidebar-foreground: var(--text-1);
   --sidebar-primary: var(--accent-cyan);
-  --sidebar-primary-foreground: #06272c;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--bg-3);
   --sidebar-accent-foreground: var(--text-0);
   --sidebar-border: var(--border-1);
   --sidebar-ring: var(--accent-cyan);
-  --radius: 8px;
+  --radius: 12px;
 }
 
 @theme inline {
@@ -119,6 +141,10 @@
   --color-fsoc-text2: var(--text-2);
   --color-fsoc-text3: var(--text-3);
   --color-fsoc-cyan: var(--accent-cyan);
+  --color-fsoc-vivid: var(--accent-vivid);
+  --color-fsoc-tint-warm: var(--tint-warm);
+  --color-fsoc-tint-mint: var(--tint-mint);
+  --color-fsoc-tint-soft: var(--tint-accent-soft);
   --color-fsoc-blue: var(--accent-blue);
   --color-fsoc-success: var(--success);
   --color-fsoc-warning: var(--warning);
@@ -145,25 +171,25 @@ body {
   font-family: var(--font-tech), ui-monospace, monospace;
 }
 
-/* hairline panel style */
+/* instrument panel — soft card on the cream ground */
 .panel {
   background: var(--bg-1);
   border: 1px solid var(--border-1);
-  border-radius: 8px;
+  border-radius: 18px;
 }
 
 .panel-elevated {
   background: var(--bg-2);
-  border: 1px solid var(--border-2);
-  border-radius: 8px;
+  border: 1px solid var(--border-1);
+  border-radius: 14px;
 }
 
 .panel-title {
-  font-size: 11px;
+  font-size: 10.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-2);
-  font-weight: 600;
+  color: var(--text-3);
+  font-weight: 700;
 }
 
 /* thin scrollbars — instrument feel */
@@ -172,7 +198,7 @@ body {
   height: 8px;
 }
 *::-webkit-scrollbar-track {
-  background: var(--bg-1);
+  background: transparent;
 }
 *::-webkit-scrollbar-thumb {
   background: var(--border-2);

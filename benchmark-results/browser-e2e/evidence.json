@@ -1,0 +1,441 @@
+{
+  "generatedAt": "2026-10-04T10:29:48.549Z",
+  "browser": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "url": "http://localhost:3000",
+  "seconds": 20,
+  "config": {
+    "detector": "fusion",
+    "seed": 4402
+  },
+  "phaseAtEnd": "running",
+  "crossOriginIsolated": false,
+  "checks": [
+    {
+      "name": "ONNX Runtime Web session created in the worker",
+      "ok": true,
+      "detail": "beacon-roi-v2.onnx 14422 B + track-verifier-v1.onnx 1196 B, sessions created in 632 ms"
+    },
+    {
+      "name": "no fallback to the TS forward pass",
+      "ok": true,
+      "detail": "none"
+    },
+    {
+      "name": "live-frame runtime parity ORT vs TS < 1e-4",
+      "ok": true,
+      "detail": "ROI (257.5, 268.5): ORT 0.883459 vs TS 0.883459 · |Δ| 5.52e-8"
+    },
+    {
+      "name": "perception-chain log lines produced by ORT",
+      "ok": true,
+      "detail": "17 of 17 chain lines name onnxruntime-web"
+    },
+    {
+      "name": "displayed detection provenance: runtime = onnxruntime-web",
+      "ok": true,
+      "detail": "onnxruntime-web 1.30.0 (wasm, 1 thread)"
+    },
+    {
+      "name": "displayed CV result present",
+      "ok": true,
+      "detail": "{\"x\":295,\"y\":255,\"confidence\":1}"
+    },
+    {
+      "name": "displayed AI result present (ORT score)",
+      "ok": true,
+      "detail": "{\"x\":295,\"y\":255,\"confidence\":0.9846354722976685}"
+    },
+    {
+      "name": "displayed fusion decision + reason",
+      "ok": true,
+      "detail": "agreement — agreement of 1 (1 CV, 2 AI)"
+    },
+    {
+      "name": "selected candidate reached the Kalman tracker (TRACK)",
+      "ok": true,
+      "detail": "state=TRACK det=(295.0, 255.0)"
+    },
+    {
+      "name": "Kalman prediction displayed",
+      "ok": true,
+      "detail": "{\"x\":290.9132001102488,\"y\":245.2624011979608}"
+    },
+    {
+      "name": "PID command displayed",
+      "ok": true,
+      "detail": "{\"pan_deg_s\":-0.6070159408797009,\"tilt_deg_s\":0.24672580375495062}"
+    },
+    {
+      "name": "actual mount response displayed",
+      "ok": true,
+      "detail": "actual -0.607/0.247 °/s, az -4.198° el -0.594°"
+    },
+    {
+      "name": "camera re-pointed by the mount (pose off boresight)",
+      "ok": true,
+      "detail": "{\"pan_deg\":-4.198244038603992,\"tilt_deg\":-0.5939584176475345}"
+    },
+    {
+      "name": "lock held on the beacon over the run (lock retention ≥ 80 %)",
+      "ok": true,
+      "detail": "lock retention 86.1 % · MEASURED mean error 16.90 px (PS gate 10 px; includes the initial decoy lock) · instantaneous 8.53 px"
+    },
+    {
+      "name": "no page errors",
+      "ok": true,
+      "detail": "none"
+    }
+  ],
+  "measured": {
+    "lockRetentionPercent": 86.14800759013282,
+    "meanErrorPx": 16.904799584557175,
+    "acquisitionTimeS": 0.11913333328564962,
+    "note": "Seed 4402 starts locked on a bright decoy; the mean includes that period. Performance is reported by scripts/eval-detectors.ts."
+  },
+  "finalTelemetry": {
+    "frameIndex": 531,
+    "timestampS": 20.118133333285677,
+    "detection": {
+      "found": true,
+      "x": 295,
+      "y": 255,
+      "confidence": 1,
+      "bbox": [
+        290,
+        250,
+        11,
+        11
+      ],
+      "method": "fusion",
+      "latency_ms": 4,
+      "provenance": {
+        "candidateCount": 1,
+        "cv": {
+          "x": 295,
+          "y": 255,
+          "confidence": 1
+        },
+        "ai": {
+          "x": 295,
+          "y": 255,
+          "confidence": 0.9846354722976685
+        },
+        "spatialAgreementPx": 0,
+        "predictionDistancePx": 12.313472498299799,
+        "chosenBy": "agreement",
+        "aiRejected": 0,
+        "disagreed": false,
+        "cvLatencyMs": 0.5,
+        "aiLatencyMs": 3.3000000715255737,
+        "fusionLatencyMs": 0,
+        "aiBranchCount": 2,
+        "chosenSource": "both",
+        "trackId": 3,
+        "trackAgeFrames": 520,
+        "trackP": 0.982142448425293,
+        "trackSpeedPxS": 117.21035752149683,
+        "trackRejected": 0,
+        "clutterPoints": 4,
+        "liveTracks": 2,
+        "temporalLatencyMs": 0.19999992847442627,
+        "aiRuntime": "onnxruntime-web 1.30.0 (wasm, 1 thread)",
+        "aiInferenceMs": 0.20000004768371582,
+        "aiScored": 1,
+        "chosenFusionScore": 1.1474856248333696,
+        "decisionReason": "agreement of 1 (1 CV, 2 AI)"
+      }
+    },
+    "track": {
+      "state": "TRACK",
+      "x": 292.2857927513108,
+      "y": 248.5328712033094,
+      "vx": 32.52224569058782,
+      "vy": 44.82565326408409,
+      "confidence": 1,
+      "track_age_frames": 503,
+      "lost_frames_consecutive": 0,
+      "is_prediction": false
+    },
+    "predicted": {
+      "x": 290.9132001102488,
+      "y": 245.2624011979608
+    },
+    "command": {
+      "pan_deg_s": -0.6070159408797009,
+      "tilt_deg_s": 0.24672580375495062
+    },
+    "mount": {
+      "azimuthDeg": -4.198244038603992,
+      "elevationDeg": -0.5939584176475345,
+      "commandedPanRateDegS": -0.6070159408797009,
+      "commandedTiltRateDegS": 0.24672580375495062,
+      "actualPanRateDegS": -0.6070159408796882,
+      "actualTiltRateDegS": 0.2467258037549497,
+      "rateSaturated": false,
+      "accelLimited": false,
+      "travelLimited": false,
+      "panEffort": 0.12140318817593765,
+      "tiltEffort": 0.04934516075098994
+    },
+    "camera": {
+      "pan_deg": -4.198244038603992,
+      "tilt_deg": -0.5939584176475345
+    },
+    "errorPx": 8.53149810520951,
+    "metrics": {
+      "elapsedS": 20.118133333285677,
+      "fpsAlgorithm": 131.72583165807333,
+      "fpsWallClock": 26.394098856152553,
+      "avgErrorPx": 16.904799584557175,
+      "maxErrorPx": 356.84263727054326,
+      "rmsePx": 51.06424416514101,
+      "lossPercent": 0,
+      "lockRetentionPercent": 86.14800759013282,
+      "acquisitionTimeS": 0.11913333328564962,
+      "reacquisitionAvgS": 0.07589999997615826,
+      "reacquisitionEvents": 1,
+      "processingAvgMs": 7.591525423773714,
+      "detectionRatePercent": 100,
+      "avgConfidence": 0.9992291826560166,
+      "framesProcessed": 531
+    }
+  },
+  "systemLog": [
+    {
+      "level": "SYSTEM",
+      "message": "Learned model loaded — beacon-roi-v2",
+      "detail": "2989 parameters"
+    },
+    {
+      "level": "SYSTEM",
+      "message": "ONNX Runtime Web ready — onnxruntime-web 1.30.0 (wasm, 1 thread)",
+      "detail": "beacon-roi-v2.onnx 14422 B + track-verifier-v1.onnx 1196 B, sessions created in 632 ms"
+    },
+    {
+      "level": "SYSTEM",
+      "message": "Track verifier loaded — track-verifier-v1",
+      "detail": "temporal decoy rejection + clutter map active"
+    },
+    {
+      "level": "SYSTEM",
+      "message": "Mission initialized",
+      "detail": "scene 2000×2000, cam 640×480 @ 30Hz, seed 4402"
+    },
+    {
+      "frame": 1,
+      "level": "SYSTEM",
+      "message": "Runtime parity on live frame",
+      "detail": "ROI (257.5, 268.5): ORT 0.883459 vs TS 0.883459 · |Δ| 5.52e-8"
+    }
+  ],
+  "chainLog": [
+    {
+      "frame": 30,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (268.5, 239.5) c=1.00 [3 cand] · AI (453.0, 245.0) p=0.985 [3 ROIs, 0.50 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION track-verified trackP=0.99 → (453.0, 245.0) conf=1.00 · track-verified of 3 (3 CV, 5 AI); 2 rejected"
+    },
+    {
+      "frame": 30,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(457.5, 270.3) est=(455.9, 261.3) · cmd pan=1.82 tilt=-0.21 °/s · mount actual=1.82/-0.21 °/s az=0.002° el=0.174°"
+    },
+    {
+      "frame": 60,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (384.0, 215.0) c=1.00 [4 cand] · AI (384.0, 215.0) p=0.985 [4 ROIs, 0.40 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (384.0, 215.0) conf=1.00 · agreement of 4 (4 CV, 5 AI); 2 rejected"
+    },
+    {
+      "frame": 60,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(386.6, 202.0) est=(385.7, 206.4) · cmd pan=0.99 tilt=-0.36 °/s · mount actual=0.99/-0.36 °/s az=1.589° el=-0.637°"
+    },
+    {
+      "frame": 90,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (307.0, 339.0) c=1.00 [2 cand] · AI (307.0, 339.0) p=0.985 [2 ROIs, 0.60 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (307.0, 339.0) conf=1.00 · agreement of 2 (2 CV, 2 AI); 1 rejected"
+    },
+    {
+      "frame": 90,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(308.2, 335.1) est=(307.8, 336.4) · cmd pan=-0.05 tilt=1.51 °/s · mount actual=-0.05/1.51 °/s az=2.105° el=0.133°"
+    },
+    {
+      "frame": 120,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (240.0, 340.0) c=1.00 [3 cand] · AI (240.0, 340.0) p=0.985 [3 ROIs, 0.50 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (240.0, 340.0) conf=1.00 · agreement of 3 (3 CV, 5 AI); 1 rejected"
+    },
+    {
+      "frame": 120,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(238.2, 352.2) est=(238.8, 348.1) · cmd pan=-1.03 tilt=1.48 °/s · mount actual=-1.03/1.48 °/s az=1.441° el=2.091°"
+    },
+    {
+      "frame": 150,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (202.0, 201.0) c=1.00 [3 cand] · AI (126.0, 372.0) p=0.997 [3 ROIs, 0.50 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION cv-only trackP=0.99 → (202.0, 201.0) conf=1.00 · cv-only of 3 (3 CV, 5 AI); 1 rejected"
+    },
+    {
+      "frame": 150,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(199.9, 210.6) est=(200.6, 207.4) · cmd pan=-1.71 tilt=-0.46 °/s · mount actual=-1.71/-0.46 °/s az=-0.211° el=2.766°"
+    },
+    {
+      "frame": 180,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (602.5, 67.5) c=1.00 [2 cand] · AI (215.0, 108.0) p=0.985 [2 ROIs, 0.30 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION track-verified trackP=1.00 → (215.0, 108.0) conf=1.00 · track-verified of 2 (2 CV, 3 AI); 1 rejected"
+    },
+    {
+      "frame": 180,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(208.6, 100.1) est=(210.7, 102.7) · cmd pan=-1.62 tilt=-1.77 °/s · mount actual=-1.62/-1.77 °/s az=-2.211° el=1.199°"
+    },
+    {
+      "frame": 210,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (265.0, 185.0) c=1.00 [2 cand] · AI (595.0, 53.0) p=0.997 [2 ROIs, 2.50 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION cv-only trackP=0.99 → (265.0, 185.0) conf=1.00 · cv-only of 2 (2 CV, 5 AI)"
+    },
+    {
+      "frame": 210,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(261.7, 170.6) est=(262.8, 175.5) · cmd pan=-1.07 tilt=-0.75 °/s · mount actual=-1.07/-0.75 °/s az=-3.813° el=-0.477°"
+    },
+    {
+      "frame": 240,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (314.0, 331.0) c=1.00 [1 cand] · AI (314.0, 331.0) p=0.985 [1 ROIs, 0.30 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (314.0, 331.0) conf=1.00 · agreement of 1 (1 CV, 2 AI)"
+    },
+    {
+      "frame": 240,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(312.4, 326.0) est=(313.0, 327.7) · cmd pan=-0.43 tilt=1.38 °/s · mount actual=0.00/1.38 °/s az=-4.250° el=-0.011°"
+    },
+    {
+      "frame": 270,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (404.0, 349.0) c=1.00 [1 cand] · AI (404.0, 349.0) p=0.985 [1 ROIs, 0.30 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (404.0, 349.0) conf=1.00 · agreement of 1 (1 CV, 2 AI)"
+    },
+    {
+      "frame": 270,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(404.2, 360.3) est=(404.1, 356.5) · cmd pan=0.92 tilt=1.59 °/s · mount actual=0.92/1.59 °/s az=-3.803° el=1.942°"
+    },
+    {
+      "frame": 300,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (445.0, 214.0) c=1.00 [2 cand] · AI (464.0, 370.0) p=0.997 [2 ROIs, 0.30 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION cv-only trackP=0.99 → (445.0, 214.0) conf=1.00 · cv-only of 2 (2 CV, 4 AI)"
+    },
+    {
+      "frame": 300,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(449.6, 224.3) est=(448.1, 220.9) · cmd pan=1.61 tilt=-0.35 °/s · mount actual=1.61/-0.35 °/s az=-2.203° el=2.781°"
+    },
+    {
+      "frame": 330,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (305.5, 40.5) c=1.00 [3 cand] · AI (440.0, 110.0) p=0.985 [3 ROIs, 0.50 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION track-verified trackP=0.99 → (440.0, 110.0) conf=1.00 · track-verified of 3 (3 CV, 5 AI); 2 rejected"
+    },
+    {
+      "frame": 330,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(444.6, 104.9) est=(443.1, 106.6) · cmd pan=1.73 tilt=-1.82 °/s · mount actual=1.73/-1.82 °/s az=-0.227° el=1.351°"
+    },
+    {
+      "frame": 360,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (388.0, 174.0) c=1.00 [4 cand] · AI (388.0, 174.0) p=0.985 [4 ROIs, 0.30 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (388.0, 174.0) conf=1.00 · agreement of 4 (4 CV, 6 AI); 3 rejected"
+    },
+    {
+      "frame": 360,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(394.0, 159.5) est=(392.0, 164.4) · cmd pan=1.08 tilt=-0.86 °/s · mount actual=1.08/-0.86 °/s az=1.412° el=-0.400°"
+    },
+    {
+      "frame": 390,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (317.0, 318.0) c=1.00 [2 cand] · AI (317.0, 318.0) p=0.985 [2 ROIs, 0.40 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (317.0, 318.0) conf=1.00 · agreement of 2 (2 CV, 3 AI); 1 rejected"
+    },
+    {
+      "frame": 390,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(320.6, 312.9) est=(319.4, 314.6) · cmd pan=0.15 tilt=1.16 °/s · mount actual=0.15/1.16 °/s az=2.129° el=-0.203°"
+    },
+    {
+      "frame": 420,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (248.0, 361.0) c=1.00 [2 cand] · AI (248.0, 361.0) p=0.985 [2 ROIs, 0.40 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (248.0, 361.0) conf=1.00 · agreement of 2 (2 CV, 4 AI); 1 rejected"
+    },
+    {
+      "frame": 420,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(248.2, 370.5) est=(248.2, 367.3) · cmd pan=-0.86 tilt=1.77 °/s · mount actual=-0.86/1.77 °/s az=1.711° el=1.648°"
+    },
+    {
+      "frame": 450,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (206.0, 244.0) c=1.00 [3 cand] · AI (51.0, 369.0) p=0.997 [3 ROIs, 0.40 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION cv-only trackP=0.99 → (206.0, 244.0) conf=1.00 · cv-only of 3 (3 CV, 5 AI); 1 rejected"
+    },
+    {
+      "frame": 450,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(202.2, 256.3) est=(203.5, 252.2) · cmd pan=-1.54 tilt=0.05 °/s · mount actual=-1.54/0.05 °/s az=0.276° el=2.799°"
+    },
+    {
+      "frame": 480,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (202.0, 119.0) c=1.00 [2 cand] · AI (202.0, 119.0) p=0.986 [2 ROIs, 0.30 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (202.0, 119.0) conf=1.00 · agreement of 2 (2 CV, 4 AI); 1 rejected"
+    },
+    {
+      "frame": 480,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(198.8, 119.0) est=(199.9, 119.0) · cmd pan=-1.78 tilt=-1.73 °/s · mount actual=-1.78/-1.73 °/s az=-1.673° el=1.717°"
+    },
+    {
+      "frame": 510,
+      "level": "DETECT",
+      "message": "Perception chain",
+      "detail": "CV (246.0, 152.0) c=1.00 [2 cand] · AI (246.0, 152.0) p=0.985 [2 ROIs, 0.30 ms, onnxruntime-web 1.30.0 (wasm, 1 thread)] · FUSION agreement trackP=0.99 → (246.0, 152.0) conf=1.00 · agreement of 2 (2 CV, 4 AI)"
+    },
+    {
+      "frame": 510,
+      "level": "TRACK",
+      "message": "Kalman → PID → mount",
+      "detail": "state=TRACK pred=(240.9, 138.6) est=(242.6, 143.1) · cmd pan=-1.27 tilt=-1.26 °/s · mount actual=-1.27/-1.26 °/s az=-3.440° el=-0.203°"
+    }
+  ],
+  "console": [
+    "[warn] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+    "[log] THREE.WebGLRenderer: Context Lost."
+  ]
+}

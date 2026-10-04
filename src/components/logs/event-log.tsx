@@ -12,17 +12,29 @@ import type { LogLevel } from '@/engine/types';
 import { Button } from '@/components/ui/button';
 
 const LEVEL_COLOR: Record<LogLevel, string> = {
-  INFO: '#7d8994',
-  DETECT: '#72d9e8',
-  STATE: '#8faee8',
-  METRIC: '#79c99b',
-  DIST: '#d8b56b',
-  TRACK: '#d7b36e',
-  WARN: '#d8b56b',
-  ERROR: '#d87575',
+  SYSTEM: 'var(--text-2)',
+  SCENARIO: 'var(--text-2)',
+  SEARCH: 'var(--warning)',
+  DETECT: 'var(--accent-cyan)',
+  TRACK: 'var(--success)',
+  PREDICT: 'var(--state-predict)',
+  CONTROL: 'var(--accent-blue)',
+  MOUNT: 'var(--accent-blue)',
+  ACQUIRE: 'var(--success)',
+  LOCK: 'var(--success)',
+  LOSS: 'var(--danger)',
+  REACQUIRE: 'var(--success)',
+  DISTURBANCE: 'var(--warning)',
+  METRIC: 'var(--success)',
+  STATE: 'var(--accent-blue)',
+  INFO: 'var(--text-2)',
+  WARN: 'var(--warning)',
+  ERROR: 'var(--danger)',
 };
 
-const FILTERS: (LogLevel | 'ALL')[] = ['ALL', 'STATE', 'METRIC', 'DETECT', 'DIST', 'WARN', 'ERROR'];
+const FILTERS: (LogLevel | 'ALL')[] = [
+  'ALL', 'STATE', 'DETECT', 'CONTROL', 'MOUNT', 'LOCK', 'LOSS', 'REACQUIRE', 'DISTURBANCE', 'METRIC', 'ERROR',
+];
 
 export function EventLog() {
   const logs = useFsoc((s) => s.logs);
@@ -101,7 +113,7 @@ export function EventLog() {
           filtered.slice(-160).map((l) => (
             <div key={l.id} className="flex gap-3 whitespace-nowrap">
               <span className="text-fsoc-text3 shrink-0">{l.t}</span>
-              <span className="shrink-0 w-12" style={{ color: LEVEL_COLOR[l.level] }}>
+              <span className="shrink-0 w-[68px]" style={{ color: LEVEL_COLOR[l.level] }}>
                 {l.level}
               </span>
               <span className="text-fsoc-text1 truncate">{l.message}</span>

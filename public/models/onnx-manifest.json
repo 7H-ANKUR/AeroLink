@@ -1,0 +1,75 @@
+{
+  "generatedAt": "2026-09-28T05:38:36+00:00",
+  "exporter": "torch 2.14.0+cpu (TorchScript exporter), opset 17",
+  "models": {
+    "beacon-roi-v2": {
+      "file": "beacon-roi-v2.onnx",
+      "sha256": "1bb8a7ded0f6d9b1bd34b103e383ef66f1be33af3ae000f2f8b623a24e84ffbb",
+      "bytes": 14422,
+      "sourceWeights": "beacon-roi-v2.bin",
+      "sourceWeightsSha256": "73f5b53c8826bbc683a887e841ed2bf987fa86c5e44ac2df351a64ce8bc3b151",
+      "input": {
+        "name": "patches",
+        "dtype": "float32",
+        "shape": [
+          "N",
+          1,
+          24,
+          24
+        ],
+        "preprocessing": "crop 24x24 at candidate centroid (edge replication), subtract median of 2-px border ring, /128, clip [-1, 2]"
+      },
+      "output": {
+        "name": "p_beacon",
+        "dtype": "float32",
+        "shape": [
+          "N",
+          1
+        ],
+        "meaning": "sigmoid P(ROI contains the beacon)"
+      },
+      "parity": {
+        "maxAbsVsTorch": 3.5762786865234375e-07,
+        "maxAbsVsFixture": 4.172325134277344e-07
+      }
+    },
+    "track-verifier-v1": {
+      "file": "track-verifier-v1.onnx",
+      "sha256": "c5fd64314968a0b0a5189f9dc02b313076beca9174b3e7221a40e8de729d67ad",
+      "bytes": 1196,
+      "sourceWeights": "track-verifier-v1.json",
+      "sourceWeightsSha256": "0c482259b8b4d152be4acb8fa3bbd2ed76a589b0203cad14cc5ec0943b2468a4",
+      "input": {
+        "name": "features",
+        "dtype": "float32",
+        "shape": [
+          "N",
+          8
+        ],
+        "features": [
+          "ai_mean",
+          "cv_mean",
+          "size_mean",
+          "bright_mean",
+          "speed",
+          "speed_reliability",
+          "moving_evidence",
+          "persistence"
+        ]
+      },
+      "output": {
+        "name": "p_beacon",
+        "dtype": "float32",
+        "shape": [
+          "N",
+          1
+        ],
+        "meaning": "sigmoid P(candidate track is the beacon), calibrated"
+      },
+      "parity": {
+        "maxAbsVsTorch": 7.450580596923828e-08,
+        "maxAbsVsFixture": 7.450580596923828e-08
+      }
+    }
+  }
+}

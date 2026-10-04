@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import { engine, type FrameData } from './engine-client';
 import { DEFAULT_CONFIG, type ScenarioConfig } from '@/engine/config';
+import { buildDemoConfig } from '@/engine/demo';
 import type { EnginePhase, LogEntry, RunResult, TelemetrySnapshot } from '@/engine/types';
 
 export type ViewId = 'launch' | 'laboratory' | 'scenarios' | 'benchmark' | 'analytics' | 'replay' | 'comparison' | 'settings';
@@ -27,6 +28,7 @@ interface FsocState {
   setView(v: ViewId): void;
   setConfig(c: ScenarioConfig): void;
   startRun(): void;
+  startDemo(): void;
   pauseRun(): void;
   stopRun(): void;
   killBeacon(): void;
@@ -58,6 +60,13 @@ export const useFsoc = create<FsocState>((set, get) => ({
     const { config } = get();
     engine.start(config);
     set({ configLocked: true, phase: 'initializing' });
+  },
+
+  /** §22 — one-button judge demonstration on a fixed seed. */
+  startDemo: () => {
+    const config = buildDemoConfig();
+    engine.start(config, true);
+    set({ config, configLocked: true, phase: 'initializing', view: 'laboratory' });
   },
 
   pauseRun: () => {
@@ -96,6 +105,13 @@ export function bindEngineToStore(): () => void {
 
 export function getFrame(): FrameData {
   return engine.frame;
+}
+
+// End-to-end verification hook (scripts/browser-e2e.ts). Exposed ONLY when the
+// page is opened with ?e2e, so the browser test drives the app through its own
+// store actions (setConfig / startRun) and reads back what the UI shows.
+if (typeof window !== 'undefined' && window.location.search.includes('e2e')) {
+  (window as unknown as { __fsoc: typeof useFsoc }).__fsoc = useFsoc;
 }
 
 export { engine };

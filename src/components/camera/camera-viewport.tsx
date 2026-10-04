@@ -12,6 +12,13 @@ import { engine } from '@/lib/engine-client';
 import { useFsoc } from '@/lib/store';
 import { STATE_COLORS, STATE_LABELS } from '@/components/shell/state-colors';
 
+/**
+ * The sensor frame stays dark under the light theme: it is the engine's
+ * grayscale frame buffer, not chrome. Mirrors --sensor-void in globals.css
+ * (canvas fillStyle cannot resolve a CSS custom property).
+ */
+const SENSOR_VOID = '#131a28';
+
 export function CameraViewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -66,9 +73,9 @@ export function CameraViewport() {
         }
         ctx.putImageData(img, 0, 0);
       } else if (!f.buf) {
-        ctx.fillStyle = '#05070a';
+        ctx.fillStyle = SENSOR_VOID;
         ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = '#3a454f';
+        ctx.fillStyle = '#6E7C99';
         ctx.font = '12px ui-monospace, monospace';
         ctx.textAlign = 'center';
         ctx.fillText('NO SIGNAL — start a run from Mission Control', W / 2, H / 2);
@@ -91,7 +98,7 @@ export function CameraViewport() {
         octx.moveTo(cx, cy - 10); octx.lineTo(cx, cy + 10);
         octx.stroke();
         // reticle ring at lock radius
-        octx.strokeStyle = 'rgba(114,217,232,0.35)';
+        octx.strokeStyle = 'rgba(242,104,42,0.38)';
         octx.setLineDash([3, 4]);
         octx.beginPath();
         octx.arc(cx, cy, config.tracking.lockRadiusPx, 0, Math.PI * 2);
@@ -117,7 +124,7 @@ export function CameraViewport() {
       // detection bbox + centroid
       if (showDet && snap.detection.found && snap.detection.x !== null && snap.detection.y !== null) {
         const [bx, by, bw, bh] = snap.detection.bbox ?? [snap.detection.x - 5, snap.detection.y - 5, 10, 10];
-        octx.strokeStyle = 'rgba(114,217,232,0.95)';
+        octx.strokeStyle = 'rgba(242,104,42,0.95)';
         octx.lineWidth = 1;
         octx.strokeRect(bx - 0.5, by - 0.5, bw + 1, bh + 1);
         // centroid cross
@@ -140,15 +147,55 @@ export function CameraViewport() {
         octx.stroke();
       }
 
-      // error line: camera center → track estimate
-      if (snap.track.x !== null && snap.track.y !== null && snap.track.state === 'TRACK') {
-        octx.strokeStyle = 'rgba(121,201,155,0.4)';
-        octx.setLineDash([2, 3]);
-        octx.beginPath();
-        octx.moveTo(cx, cy);
-        octx.lineTo(snap.track.x, snap.track.y);
-        octx.stroke();
-        octx.setLineDash([]);
+      // POINTING ERROR VECTOR (master prompt §16, §17).
+      // Drawn in every state that has an estimate — not only TRACK — because
+      // the whole point is to watch it shrink during acquisition. Labelled with
+      // the live magnitude so the convergence is readable, not just visible.
+      if (snap.track.x !== null && snap.track.y !== null && snap.track.state !== 'SEARCH') {
+        const ex = snap.track.x;
+        const ey = snap.track.y;
+        const dx = ex - cx;
+        const dy = ey - cy;
+        const mag = Math.hypot(dx, dy);
+        const locked = mag <= config.tracking.lockRadiusPx;
+        const col = locked ? 'rgba(53,196,106,0.95)' : 'rgba(242,104,42,0.95)';
+
+        if (mag > 2) {
+          octx.strokeStyle = col;
+          octx.lineWidth = 1.6;
+          octx.beginPath();
+          octx.moveTo(cx, cy);
+          octx.lineTo(ex, ey);
+          octx.stroke();
+
+          // arrow head at the estimate end
+          const ang = Math.atan2(dy, dx);
+          const head = 7;
+          octx.beginPath();
+          octx.moveTo(ex, ey);
+          octx.lineTo(ex - head * Math.cos(ang - Math.PI / 7), ey - head * Math.sin(ang - Math.PI / 7));
+          octx.moveTo(ex, ey);
+          octx.lineTo(ex - head * Math.cos(ang + Math.PI / 7), ey - head * Math.sin(ang + Math.PI / 7));
+          octx.stroke();
+
+          // magnitude label, offset perpendicular to the vector so it does not
+          // sit on top of the line
+          const midX = cx + dx * 0.55;
+          const midY = cy + dy * 0.55;
+          const nx = -dy / (mag || 1);
+          const ny = dx / (mag || 1);
+          const label = `${mag.toFixed(1)} px`;
+          octx.font = '600 11px ui-monospace, monospace';
+          octx.textAlign = 'center';
+          octx.textBaseline = 'middle';
+          const lx = midX + nx * 12;
+          const ly = midY + ny * 12;
+          const tw = octx.measureText(label).width;
+          octx.fillStyle = 'rgba(10,14,22,0.72)';
+          octx.fillRect(lx - tw / 2 - 4, ly - 8, tw + 8, 16);
+          octx.fillStyle = col;
+          octx.fillText(label, lx, ly);
+        }
       }
     };
     raf = requestAnimationFrame(render);
@@ -162,7 +209,7 @@ export function CameraViewport() {
 
   return (
     <div className="relative h-full w-full select-none" data-acq-flash={acqFlash}>
-      <div className="absolute inset-0 border border-fsoc-border1 rounded-lg overflow-hidden bg-[#05070a]">
+      <div className="absolute inset-0 border border-fsoc-border1 rounded-lg overflow-hidden bg-[var(--sensor-void)]">
         <canvas
           ref={canvasRef}
           width={config.camera.resolutionWidth}
@@ -229,7 +276,7 @@ function AcqRing({ flash }: { flash: number }) {
 }
 
 function continue_noSnap(octx: CanvasRenderingContext2D, W: number, H: number): void {
-  octx.strokeStyle = 'rgba(114,217,232,0.35)';
+  octx.strokeStyle = 'rgba(242,104,42,0.38)';
   octx.lineWidth = 1;
   octx.beginPath();
   octx.moveTo(W / 2 - 10, H / 2);

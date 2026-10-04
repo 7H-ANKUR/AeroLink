@@ -13,12 +13,8 @@
  */
 import { describe, test, expect } from 'bun:test';
 import { DEFAULT_CONFIG, validateConfig, type ScenarioConfig } from '../src/engine/config';
-import { createTrajectory } from '../src/engine/trajectories';
-import { initScene, renderScene, makeBeacon } from '../src/engine/scene';
-import { createCamera, cropFrame, stepCamera, cameraCenterPx } from '../src/engine/camera';
-import { makeRng, makeGaussian } from '../src/engine/rng';
-import { Pipeline, type PipelineHost } from '../src/engine/pipeline';
-import type { PanTiltCommand } from '../src/engine/types';
+import { cameraCenterPx } from '../src/engine/camera';
+import { SimulationRunner } from '../src/engine/simulation';
 
 interface RigHooks {
   onTransition?: (from: string, to: string, fi: number) => void;
@@ -26,57 +22,22 @@ interface RigHooks {
   onLossConfirmed?: (t: number, fi: number) => void;
 }
 
+/**
+ * Test rig over the SHIPPED loop. buildRig drives SimulationRunner — the same
+ * class the Web Worker and the benchmark drive — so these assertions cover the
+ * disturbance chain, jitter clamping and integrator-reset behaviour that the
+ * app actually runs, not a simplified copy of it.
+ */
 function buildRig(config: ScenarioConfig, hooks: RigHooks = {}) {
-  const sceneData = initScene(
-    config.scene.width, config.scene.height, config.scene.backgroundLevel,
-    config.scene.distractorCount, config.seed,
-    { x: config.beacon.startX, y: config.beacon.startY ?? config.scene.height / 2 },
-  );
-  const trajectory = createTrajectory({
-    mode: config.beacon.motion, speed: config.beacon.speed,
-    sceneWidth: config.scene.width, sceneHeight: config.scene.height,
-    startX: config.beacon.startX ?? sceneData.startX,
-    startY: config.beacon.startY ?? sceneData.startY,
-    margin: 80, rng: makeRng(config.seed ^ 0x1234abcd),
-  });
-  const camera = createCamera({
-    maxPanSpeedDegS: config.camera.maxPanSpeedDegS, maxTiltSpeedDegS: config.camera.maxTiltSpeedDegS,
-    resolutionWidth: config.camera.resolutionWidth, resolutionHeight: config.camera.resolutionHeight,
-    sceneWidth: config.scene.width, sceneHeight: config.scene.height,
-    fovXDeg: config.camera.fovXDeg, fovYDeg: config.camera.fovYDeg,
-  });
-  const beacon = makeBeacon(1, sceneData.startX, sceneData.startY, config.beacon.intensity);
-  const w = config.camera.resolutionWidth;
-  const h = config.camera.resolutionHeight;
-  const frameBuf = new Uint8Array(w * h);
   const reacqTimes: number[] = [];
   const lossTimes: number[] = [];
   const transitions: string[] = [];
 
-  const host: PipelineHost = {
-    applyCommand(cmd: PanTiltCommand, dtS: number) {
-      stepCamera(camera, cmd.pan_deg_s, cmd.tilt_deg_s, dtS);
-      return { pan_deg: camera.pan_deg, tilt_deg: camera.tilt_deg };
-    },
-    viewportCenter() {
-      const c = cameraCenterPx(camera);
-      return { x: c.cx, y: c.cy };
-    },
-    pixelsPerDeg() {
-      return { x: camera.pxPerDegX, y: camera.pxPerDegY };
-    },
-    sceneToImage(x, y) {
-      const c = cameraCenterPx(camera);
-      const ix = x - (c.cx - w / 2);
-      const iy = y - (c.cy - h / 2);
-      if (ix < 0 || iy < 0 || ix >= w || iy >= h) return null;
-      return { x: ix, y: iy };
-    },
+  const sim = new SimulationRunner(config, {
     onTransition(from, to, fi) {
       transitions.push(`${from}->${to}@${fi}`);
       hooks.onTransition?.(from, to, fi);
     },
-    onAcquired() {},
     onLossConfirmed(t, fi) {
       lossTimes.push(t);
       hooks.onLossConfirmed?.(t, fi);
@@ -85,46 +46,34 @@ function buildRig(config: ScenarioConfig, hooks: RigHooks = {}) {
       reacqTimes.push(t);
       hooks.onReacquired?.(t);
     },
-  };
-  const pipeline = new Pipeline(
-    config,
-    { mode: 'simulation', fps: config.camera.updateHz, resolution: [w, h], has_ground_truth: true },
-    host,
-    'simulation',
-  );
+  });
 
   function runFrames(seconds: number, opts: { killBeaconAfterS?: number; restoreAfterS?: number } = {}) {
     const dt = 1 / config.camera.updateHz;
-    let t = 0;
     const panTiltHistory: { t: number; pan: number; tilt: number }[] = [];
     for (let fi = 1; fi <= seconds * config.camera.updateHz; fi++) {
-      t += dt;
-      const traj = trajectory.at(t);
-      beacon.x_px = traj.x;
-      beacon.y_px = traj.y;
-      beacon.vx_px_s = traj.vx;
-      beacon.vy_px_s = traj.vy;
-      const kill = opts.killBeaconAfterS !== undefined && t >= opts.killBeaconAfterS && (opts.restoreAfterS === undefined || t < opts.restoreAfterS);
-      renderScene({
-        scene: sceneData.scene, background: sceneData.background,
-        sceneWidth: config.scene.width, sceneHeight: config.scene.height,
-        backgroundLevel: config.scene.backgroundLevel, beacon,
-        beaconSizePx: config.beacon.sizePx, beaconShape: 'square',
-        killBeacon: kill, blinkOff: false, distractors: sceneData.distractors,
-      });
-      const cc = cameraCenterPx(camera);
-      cropFrame(sceneData.scene, config.scene.width, config.scene.height, frameBuf, w, h, cc.cx, cc.cy);
-      pipeline.step({
-        frame: frameBuf, width: w, height: h, timestamp_s: t, frame_index: fi,
-        ground_truth: { ...beacon, x_px: beacon.x_px - (cc.cx - w / 2), y_px: beacon.y_px - (cc.cy - h / 2) },
-        pan_deg: camera.pan_deg, tilt_deg: camera.tilt_deg,
-      });
-      panTiltHistory.push({ t, pan: camera.pan_deg, tilt: camera.tilt_deg });
+      const t = sim.simTimeS + dt;
+      const kill =
+        opts.killBeaconAfterS !== undefined &&
+        t >= opts.killBeaconAfterS &&
+        (opts.restoreAfterS === undefined || t < opts.restoreAfterS);
+      sim.setBeaconKilled(kill);
+      sim.step(dt);
+      panTiltHistory.push({ t: sim.simTimeS, pan: sim.camera.pan_deg, tilt: sim.camera.tilt_deg });
     }
-    return { panTiltHistory, camera };
+    return { panTiltHistory, camera: sim.camera };
   }
 
-  return { pipeline, runFrames, transitions, reacqTimes, lossTimes, camera, config, trajectory };
+  return {
+    pipeline: sim.pipeline,
+    runFrames,
+    transitions,
+    reacqTimes,
+    lossTimes,
+    camera: sim.camera,
+    config,
+    trajectory: sim.trajectory,
+  };
 }
 
 describe('Closed-loop integration (§17, §33 A–R)', () => {

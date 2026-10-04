@@ -64,9 +64,35 @@ export class Tracker {
     return this.state;
   }
 
-  /** Gating hint for multi-candidate selection (docs/04 §4.9). */
+  /** Frames since the last accepted measurement. Read by the hybrid
+   *  detector's decision engine; derived from the tracker's own history,
+   *  never from ground truth. */
+  get lostFrames(): number {
+    return this.lostConsecutive;
+  }
+
+  /** Consecutive frames the current track has survived. */
+  get trackAgeFrames(): number {
+    return this.trackAge;
+  }
+
+  /** Pre-correction Kalman prediction for this frame, for events.csv
+   *  (docs/05 §3 predicted_x / predicted_y). Null until initialised. */
+  get lastPrediction(): { x: number; y: number } | null {
+    return this.predicted;
+  }
+
+  /** Gating hint for multi-candidate selection (docs/04 §4.9).
+   *
+   *  Only offered while a track is ACTIVE. During SEARCH it must be null: the
+   *  detector has to be free to find the beacon anywhere in the frame, and the
+   *  confidence floor (which only applies to cold search) has to engage. Gating
+   *  a cold search on a stale estimate would reject the very detection needed
+   *  to recover. */
   get predictionHint(): { x: number; y: number } | null {
-    return this.kalman.isInitialized ? this.kalman.position() : null;
+    const active = this.state === 'TRACK' || this.state === 'PREDICT_REACQUIRE' ||
+      this.state === 'CANDIDATE' || this.state === 'ACQUIRE';
+    return active && this.kalman.isInitialized ? this.kalman.position() : null;
   }
 
   update(detection: Detection | null, timestampS: number, frameIndex: number, dtS: number): TrackState {
@@ -75,6 +101,29 @@ export class Tracker {
     // 1. Predict regardless of measurement availability
     const pred = this.kalman.predict(Math.max(dtS, 1e-3));
     this.predicted = this.kalman.isInitialized ? pred : null;
+
+    // Deliberate target switch (false-lock recovery by the hybrid detector).
+    // The old track was following the wrong object: its Kalman state must not
+    // be blended with the new position, and the switch is counted honestly as
+    // a loss followed by a re-confirmed reacquisition. Detectors that never
+    // set `newTarget` (classical, learned) are unaffected.
+    if (
+      detection &&
+      detection.found &&
+      detection.newTarget === true &&
+      (this.state === 'TRACK' || this.state === 'PREDICT_REACQUIRE')
+    ) {
+      if (this.lossStartS === null) {
+        this.lossStartS = timestampS;
+        this.events.onLossConfirmed?.(timestampS, frameIndex);
+      }
+      this.kalman.reset();
+      this.state = 'ACQUIRE';
+      this.candidateStreak = 0;
+      this.candidateMiss = 0;
+      this.trackAge = 0;
+      this.lastCandidatePos = null;
+    }
 
     if (detection && detection.found && detection.x !== null && detection.y !== null) {
       // Spatial-consistency gate (temporal scoring, docs/MVP-Tech-Doc §10):

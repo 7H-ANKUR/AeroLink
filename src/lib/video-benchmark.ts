@@ -72,6 +72,7 @@ export class VideoBenchmarkRunner {
       minAreaPx: this.config.tracking.minAreaPx,
       maxAreaPx: this.config.tracking.maxAreaPx,
       expectedBeaconSize: this.config.beacon.sizePx * this.config.beacon.sizePx,
+      minConfidence: this.config.tracking.minDetectionConfidence,
     });
     this.tracker = new Tracker({
       acquisitionConfirmFrames: this.config.tracking.acquisitionConfirmFrames,

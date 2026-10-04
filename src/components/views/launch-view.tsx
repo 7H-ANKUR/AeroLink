@@ -14,6 +14,7 @@ const PIPELINE = ['SCENE', 'BEACON', 'CAMERA', 'DETECTION', 'TRACKING', 'CONTROL
 export function LaunchView() {
   const setView = useFsoc((s) => s.setView);
   const startRun = useFsoc((s) => s.startRun);
+  const startDemo = useFsoc((s) => s.startDemo);
 
   return (
     <div className="flex-1 min-h-0 relative overflow-hidden">
@@ -21,7 +22,7 @@ export function LaunchView() {
       <div className="absolute inset-0 opacity-50 pointer-events-none">
         <Scene3D />
       </div>
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0a0d1066] to-[#0a0d10]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#fbf4eecc] to-[var(--bg-0)]" />
 
       <div className="relative h-full flex flex-col items-center justify-center gap-8 px-6">
         <div className="text-center max-w-2xl">
@@ -29,7 +30,7 @@ export function LaunchView() {
             <span className="w-1.5 h-1.5 rounded-full bg-fsoc-cyan" />
             SIH 2026 · PROBLEM STATEMENT 169
           </div>
-          <h1 className="text-[34px] font-semibold tracking-[0.22em] text-fsoc-text0">FSOC-PAT</h1>
+          <h1 className="text-[34px] font-semibold tracking-[0.22em] text-fsoc-text0">AeroLink FSOC-PAT</h1>
           <p className="mt-1 text-[13px] text-fsoc-text2 tracking-wide">Virtual Coarse Alignment Laboratory</p>
           <p className="mt-4 text-[12px] leading-relaxed text-fsoc-text3 max-w-lg mx-auto">
             Software environment for simulation, visual tracking and coarse optical alignment of
@@ -37,16 +38,26 @@ export function LaunchView() {
             Kalman-predicted tracking and closed-loop pan/tilt control — with measured evidence.
           </p>
           <div className="mt-7 flex items-center justify-center gap-3">
+            {/* §22 — the demonstration path: one button, fixed seed, no setup */}
             <Button
               size="lg"
-              className="h-11 px-6 bg-fsoc-cyan text-[#06272c] hover:bg-fsoc-cyan/85 font-semibold tracking-[0.1em] gap-2"
+              className="h-11 px-6 bg-fsoc-cyan text-white hover:bg-fsoc-cyan/85 font-semibold tracking-[0.1em] gap-2"
+              onClick={() => startDemo()}
+              title="Deterministic end-to-end demonstration: search → detect → lock → disturbance → signal loss → reacquisition → report"
+            >
+              RUN JUDGE DEMONSTRATION
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="h-11 px-5 tracking-[0.1em]"
               onClick={() => {
                 setView('laboratory');
                 setTimeout(() => startRun(), 350);
               }}
             >
               LAUNCH LABORATORY
-              <ArrowRight className="w-4 h-4" />
             </Button>
             <Button
               variant="secondary"

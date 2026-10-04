@@ -8,6 +8,8 @@
  */
 import { Check, X, Minus } from 'lucide-react';
 import { useFsoc } from '@/lib/store';
+import { SimulatedLinkPanel, EvidencePanel } from '@/components/mission/mission-panels';
+import { PerceptionPanel } from '@/components/mission/perception-panel';
 import { STATE_COLORS, STATE_LABELS } from '@/components/shell/state-colors';
 
 function Row({ label, value, unit, mono = true }: { label: string; value: string; unit?: string; mono?: boolean }) {
@@ -18,6 +20,29 @@ function Row({ label, value, unit, mono = true }: { label: string; value: string
         {value}
         {unit && <span className="text-fsoc-text3 ml-0.5">{unit}</span>}
       </span>
+    </div>
+  );
+}
+
+/** Signed fixed-point, so a rate of zero reads as 0.00 rather than -0.00. */
+function signed(v: number, dp: number): string {
+  const r = Number(v.toFixed(dp));
+  return `${r >= 0 ? '+' : ''}${r.toFixed(dp)}`;
+}
+
+/** Actuator effort: fraction of the mount's rate envelope currently in use. */
+function EffortBar({ label, value, live }: { label: string; value: number; live: boolean }) {
+  const pct = Math.max(0, Math.min(1, value)) * 100;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[9px] tracking-[0.12em] text-fsoc-text3 w-8">{label}</span>
+      <div className="flex-1 h-1.5 rounded-full bg-fsoc-bg2 overflow-hidden">
+        <div
+          className="h-full rounded-full transition-[width] duration-100"
+          style={{ width: `${live ? pct : 0}%`, background: pct > 92 ? 'var(--warning)' : 'var(--accent-cyan)' }}
+        />
+      </div>
+      <span className="tnum text-[10px] text-fsoc-text2 w-9 text-right">{live ? `${pct.toFixed(0)}%` : '—'}</span>
     </div>
   );
 }
@@ -77,6 +102,31 @@ export function TelemetryPanel() {
   const m = t?.metrics;
   const err = t?.errorPx ?? null;
   const inTarget = err !== null && err <= config.tracking.lockRadiusPx;
+
+  // Boresight error in degrees, from the same pixel error the metrics use:
+  // θ = (e_px / image_px) · FOV  (docs/04 §4.13)
+  const boresightDeg =
+    err !== null ? (err / config.camera.resolutionWidth) * config.camera.fovXDeg : null;
+
+  const mountSat = t?.mount.rateSaturated ?? false;
+  const mountAccel = t?.mount.accelLimited ?? false;
+  const mountTravel = t?.mount.travelLimited ?? false;
+  const saturationLabel = !running
+    ? '—'
+    : mountTravel
+      ? 'TRAVEL LIMIT'
+      : mountSat
+        ? 'RATE LIMITED'
+        : mountAccel
+          ? 'SLEWING'
+          : 'NO';
+  const saturationColor = !running
+    ? 'var(--text-3)'
+    : mountTravel || mountSat
+      ? 'var(--warning)'
+      : mountAccel
+        ? 'var(--accent-blue)'
+        : 'var(--success)';
 
   const acq = m?.acquisitionTimeS ?? null;
   const reacq = m?.reacquisitionAvgS ?? null;
@@ -158,22 +208,51 @@ export function TelemetryPanel() {
         <PerfCard label="RE-ACQ" value={reacq !== null ? reacq.toFixed(2) : '—'} sub={m && m.reacquisitionEvents > 0 ? `${m.reacquisitionEvents} events` : 's'} />
       </div>
 
-      {/* control output */}
+      {/* receiver mount (master prompt §15) — every value is engine state */}
       <div className="panel px-3 py-3">
-        <div className="panel-title mb-2">Control Output</div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="panel-title">Receiver Mount</div>
+          <span className="text-[10px] font-semibold tracking-[0.12em]" style={{ color: stateColor }}>
+            {running || phase === 'paused' ? STATE_LABELS[state] : 'STANDBY'}
+          </span>
+        </div>
+
         <div className="space-y-1.5">
-          <Row
-            label="PAN"
-            value={t ? `${t.command.pan_deg_s >= 0 ? '+' : ''}${t.command.pan_deg_s.toFixed(2)}` : '—'}
-            unit="°/s"
-          />
-          <Row
-            label="TILT"
-            value={t ? `${t.command.tilt_deg_s >= 0 ? '+' : ''}${t.command.tilt_deg_s.toFixed(2)}` : '—'}
-            unit="°/s"
-          />
-          <Row label="Limit PAN" value={config.camera.maxPanSpeedDegS.toFixed(2)} unit="°/s" />
-          <Row label="Limit TILT" value={config.camera.maxTiltSpeedDegS.toFixed(2)} unit="°/s" />
+          <Row label="Azimuth" value={t ? signed(t.mount.azimuthDeg, 3) : '—'} unit="°" />
+          <Row label="Elevation" value={t ? signed(t.mount.elevationDeg, 3) : '—'} unit="°" />
+        </div>
+
+        <div className="panel-title mt-2.5 mb-1.5 !text-[9px]">Commanded</div>
+        <div className="space-y-1.5">
+          <Row label="Pan rate" value={t ? signed(t.mount.commandedPanRateDegS, 2) : '—'} unit="°/s" />
+          <Row label="Tilt rate" value={t ? signed(t.mount.commandedTiltRateDegS, 2) : '—'} unit="°/s" />
+        </div>
+
+        <div className="panel-title mt-2.5 mb-1.5 !text-[9px]">Actual (after mount dynamics)</div>
+        <div className="space-y-1.5">
+          <Row label="Pan rate" value={t ? signed(t.mount.actualPanRateDegS, 2) : '—'} unit="°/s" />
+          <Row label="Tilt rate" value={t ? signed(t.mount.actualTiltRateDegS, 2) : '—'} unit="°/s" />
+          <Row label="Rate limit" value={`±${config.camera.maxPanSpeedDegS.toFixed(1)}`} unit="°/s" />
+          <Row label="Accel limit" value={config.camera.mountAccelDegS2.toFixed(0)} unit="°/s²" />
+        </div>
+
+        <div className="panel-title mt-2.5 mb-1.5 !text-[9px]">Pointing</div>
+        <div className="space-y-1.5">
+          <Row label="Boresight error" value={boresightDeg !== null ? boresightDeg.toFixed(3) : '—'} unit="°" />
+          <Row label="Pixel error" value={err !== null ? err.toFixed(2) : '—'} unit="px" />
+        </div>
+
+        {/* actuator effort — real fraction of the rate envelope in use */}
+        <div className="mt-2.5 space-y-1.5">
+          <EffortBar label="PAN" value={t ? t.mount.panEffort : 0} live={running} />
+          <EffortBar label="TILT" value={t ? t.mount.tiltEffort : 0} live={running} />
+        </div>
+
+        <div className="mt-2.5 flex items-center justify-between">
+          <span className="text-[11px] text-fsoc-text2">Saturation</span>
+          <span className="text-[10px] font-semibold tracking-[0.1em]" style={{ color: saturationColor }}>
+            {saturationLabel}
+          </span>
         </div>
       </div>
 
@@ -260,6 +339,12 @@ export function TelemetryPanel() {
           KILL BEACON (LOSS DEMO)
         </button>
       </div>
+
+      <PerceptionPanel />
+
+      <SimulatedLinkPanel />
+
+      <EvidencePanel />
     </div>
   );
 }

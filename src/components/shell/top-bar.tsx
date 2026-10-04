@@ -34,7 +34,7 @@ export function TopBar() {
           <Crosshair className="w-4 h-4 text-fsoc-cyan" strokeWidth={1.5} />
         </div>
         <div className="leading-tight min-w-0">
-          <div className="text-[13px] font-semibold tracking-[0.18em] text-fsoc-text0">FSOC-PAT</div>
+          <div className="text-[13px] font-semibold tracking-[0.18em] text-fsoc-text0">AeroLink FSOC-PAT</div>
           <div className="text-[10px] text-fsoc-text2 tracking-wide truncate">
             Virtual Coarse Alignment Laboratory
           </div>
@@ -99,7 +99,7 @@ export function TopBar() {
         ) : (
           <Button
             size="sm"
-            className="h-8 gap-1.5 bg-fsoc-cyan text-[#06272c] hover:bg-fsoc-cyan/85 font-semibold"
+            className="h-8 gap-1.5 bg-fsoc-cyan text-white hover:bg-fsoc-cyan/85 font-semibold"
             onClick={startRun}
             disabled={!validationOk}
             title="Start run (Space)"
