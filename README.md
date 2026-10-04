@@ -1,4 +1,4 @@
-# FSOC-PAT — Virtual Coarse Alignment Laboratory
+# AeroLink  FSOC-PAT — Virtual Coarse Alignment Laboratory
 
 Software-only laboratory for **coarse pointing, acquisition and tracking (PAT)** of mobile
 free-space optical communication terminals.
